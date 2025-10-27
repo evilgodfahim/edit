@@ -9,12 +9,21 @@ from xml.dom import minidom
 # CONFIGURATION
 # -----------------------------
 FEEDS = [
-    "https://thediplomat.com/feed/",
-    "https://www.foreignaffairs.com/rss.xml",
-    "https://foreignpolicy.com/feed/",
-    "https://evilgodfahim.github.io/ps/combined.xml",
-    "https://evilgodfahim.github.io/eco/combined.xml",
-    "https://www.eiu.com/n/feed/"
+    "https://politepol.com/fd/pzVBxx3Z2fUI.xml",  # Opinion News | Daily sun
+    "https://politepol.com/fd/vIzuCnimE1YU.xml",  # Prothom Alo EN
+    "https://politepol.com/fd/QAIWwDi3wOuZ.xml",  # Opinion - Bangladesh Post
+    "https://politepol.com/fd/LONi4mJ2tfbd.xml",  # Editorial - Bangladesh Post
+    "https://evilgodfahim.github.io/rss-combo-NA/feed.xml",  # NA Editorial
+    "https://politepol.com/fd/2XdgObSDG4FD.xml",  # Opinion - Dhaka Tribune
+    "https://politepol.com/fd/xaIRlDYPW0kP.xml",  # Analysis
+    "https://politepol.com/fd/LwUmZUwUaj7i.xml",  # Reviews
+    "https://politepol.com/fd/Uh7pOg6WWCMR.xml",  # Opinions
+    "https://politepol.com/fd/GxmRWljxfGEo.xml",  # Columns
+    "https://politepol.com/fd/oT0YgLtnGzze.xml",  # Opinion
+    "https://politepol.com/fd/ggpXf4wO5uEz.xml",  # FE Views
+    "https://politepol.com/fd/OAVNbKjejtJQ.xml",  # FE Editorial
+    "https://politepol.com/fd/CnOMC37mGwul.xml",  # TBS Thoughts
+    "https://politepol.com/fd/qVPraFDG1MNh.xml",  # TDS Opinions
 ]
 
 MASTER_FILE = "feed_master.xml"
