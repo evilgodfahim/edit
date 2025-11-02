@@ -25,7 +25,9 @@ FEEDS = [
     "https://politepol.com/fd/CnOMC37mGwul.xml",  # TBS Thoughts
     "https://politepol.com/fd/qVPraFDG1MNh.xml",  # TDS Opinions
 
-"https://politepol.com/fd/vF2VjeDKWjUw.xml"
+"https://politepol.com/fd/vF2VjeDKWjUw.xml",
+
+"https://politepol.com/fd/v4jixX1PsBB9.xml "
 ]
 
 MASTER_FILE = "feed_master.xml"
