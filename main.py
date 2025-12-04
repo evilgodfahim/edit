@@ -1,195 +1,201 @@
-import feedparser
-import os
-import sys
-from datetime import datetime, timezone, timedelta
-import xml.etree.ElementTree as ET
-from xml.dom import minidom
+import feedparser  
+import os  
+import sys  
+from datetime import datetime, timezone, timedelta  
+import xml.etree.ElementTree as ET  
+from xml.dom import minidom  
+from urllib.parse import urlparse  
+import json  
 
-# -----------------------------
-# CONFIGURATION
-# -----------------------------
-FEEDS = [
-    "https://politepol.com/fd/pzVBxx3Z2fUI.xml",  # Opinion News | Daily sun
-    "https://politepol.com/fd/vIzuCnimE1YU.xml",  # Prothom Alo EN
-    "https://politepol.com/fd/QAIWwDi3wOuZ.xml",  # Opinion - Bangladesh Post
-    "https://politepol.com/fd/LONi4mJ2tfbd.xml",  # Editorial - Bangladesh Post
-    "https://evilgodfahim.github.io/rss-combo-NA/feed.xml",  # NA Editorial
-    "https://politepol.com/fd/2XdgObSDG4FD.xml",  # Opinion - Dhaka Tribune
-    "https://politepol.com/fd/xaIRlDYPW0kP.xml",  # Analysis
-    "https://politepol.com/fd/LwUmZUwUaj7i.xml",  # Reviews
-    "https://politepol.com/fd/Uh7pOg6WWCMR.xml",  # Opinions
-    "https://politepol.com/fd/GxmRWljxfGEo.xml",  # Columns
-    "https://politepol.com/fd/oT0YgLtnGzze.xml",  # Opinion
-    "https://politepol.com/fd/ggpXf4wO5uEz.xml",  # FE Views
-    "https://politepol.com/fd/OAVNbKjejtJQ.xml",  # FE Editorial
-    "https://politepol.com/fd/CnOMC37mGwul.xml",  # TBS Thoughts
-    "https://politepol.com/fd/qVPraFDG1MNh.xml",  # TDS Opinions
+# -----------------------------  
+# CONFIGURATION  
+# -----------------------------  
+FEEDS = [  
+    "https://politepol.com/fd/pzVBxx3Z2fUI.xml",
+    "https://politepol.com/fd/vIzuCnimE1YU.xml",
+    "https://politepol.com/fd/QAIWwDi3wOuZ.xml",
+    "https://politepol.com/fd/LONi4mJ2tfbd.xml",
+    "https://evilgodfahim.github.io/rss-combo-NA/feed.xml",
+    "https://politepol.com/fd/2XdgObSDG4FD.xml",
+    "https://politepol.com/fd/xaIRlDYPW0kP.xml",
+    "https://politepol.com/fd/LwUmZUwUaj7i.xml",
+    "https://politepol.com/fd/Uh7pOg6WWCMR.xml",
+    "https://politepol.com/fd/GxmRWljxfGEo.xml",
+    "https://politepol.com/fd/oT0YgLtnGzze.xml",
+    "https://politepol.com/fd/ggpXf4wO5uEz.xml",
+    "https://politepol.com/fd/OAVNbKjejtJQ.xml",
+    "https://politepol.com/fd/CnOMC37mGwul.xml",
+    "https://politepol.com/fd/qVPraFDG1MNh.xml",
+    "https://politepol.com/fd/vF2VjeDKWjUw.xml",
+    "https://politepol.com/fd/v4jixX1PsBB9.xml",
+    "https://politepol.com/fd/NxM7X35BsyKv.xml",
+    "https://politepol.com/fd/qJzBCq1mQyIq.xml",
+    "https://politepol.com/fd/d3vTXXWIpQfi.xml",
+    "https://politepol.com/fd/gXwt22exG6r5.xml",
+    "https://politepol.com/fd/wUSywgW7UoCL.xml",
+    "https://politepol.com/fd/a18TrHXs0awo.xml",
+    "https://politepol.com/fd/nqB5lyvhHzWI.xml"
+]  
 
-"https://politepol.com/fd/vF2VjeDKWjUw.xml",
+MASTER_FILE = "feed_master.xml"  
+DAILY_FILE = "daily_feed.xml"  
+LAST_SEEN_FILE = "last_seen.json"  
 
-"https://politepol.com/fd/v4jixX1PsBB9.xml",
-"https://politepol.com/fd/NxM7X35BsyKv.xml",
-"https://politepol.com/fd/qJzBCq1mQyIq.xml",
-"https://politepol.com/fd/d3vTXXWIpQfi.xml",
-"https://politepol.com/fd/gXwt22exG6r5.xml",
-"https://politepol.com/fd/wUSywgW7UoCL.xml",
-"https://politepol.com/fd/a18TrHXs0awo.xml",
-"https://politepol.com/fd/nqB5lyvhHzWI.xml"
-]
+MAX_ITEMS = 500  
+BD_OFFSET = 6  
 
-MASTER_FILE = "feed_master.xml"
-DAILY_FILE = "daily_feed.xml"
-LAST_SEEN_FILE = "last_seen.json"
+# -----------------------------  
+# UTILITIES  
+# -----------------------------  
 
-MAX_ITEMS = 500
-BD_OFFSET = 6  # Bangladesh UTC offset
+def extract_source(url):
+    try:
+        domain = urlparse(url).netloc
+        if domain.startswith("www."):
+            domain = domain[4:]
+        return domain.split(".")[0]
+    except:
+        return "unknown"
 
-import json
+def parse_date(entry):  
+    date_fields = ["published_parsed", "updated_parsed", "created_parsed"]  
+    for field in date_fields:  
+        t = getattr(entry, field, None)  
+        if t:  
+            return datetime(*t[:6], tzinfo=timezone.utc)  
+    return datetime.now(timezone.utc)  
 
-# -----------------------------
-# UTILITIES
-# -----------------------------
-def parse_date(entry):
-    """Try multiple date fields from feedparser entry"""
-    date_fields = ["published_parsed", "updated_parsed", "created_parsed"]
-    for field in date_fields:
-        t = getattr(entry, field, None)
-        if t:
-            return datetime(*t[:6], tzinfo=timezone.utc)
-    return datetime.now(timezone.utc)
+def load_existing(file_path):  
+    if not os.path.exists(file_path):  
+        return []  
+    tree = ET.parse(file_path)  
+    root = tree.getroot()  
+    items = []  
+    for item in root.findall(".//item"):  
+        try:  
+            title = item.find("title").text or ""  
+            link = item.find("link").text or ""  
+            desc = item.find("description").text or ""  
+            pubDate = item.find("pubDate").text or ""  
+            pubDate_dt = datetime.strptime(pubDate, "%a, %d %b %Y %H:%M:%S %z")  
+            items.append({"title": title, "link": link, "description": desc, "pubDate": pubDate_dt})  
+        except:  
+            continue  
+    return items  
 
-def load_existing(file_path):
-    """Load existing XML items"""
-    if not os.path.exists(file_path):
-        return []
-    tree = ET.parse(file_path)
-    root = tree.getroot()
-    items = []
-    for item in root.findall(".//item"):
-        try:
-            title = item.find("title").text or ""
-            link = item.find("link").text or ""
-            desc = item.find("description").text or ""
-            pubDate = item.find("pubDate").text or ""
-            pubDate_dt = datetime.strptime(pubDate, "%a, %d %b %Y %H:%M:%S %z")
-            items.append({"title": title, "link": link, "description": desc, "pubDate": pubDate_dt})
-        except:
-            continue
-    return items
+def write_rss(items, file_path, title="Feed"):  
+    rss = ET.Element("rss", version="2.0")  
+    channel = ET.SubElement(rss, "channel")  
+    ET.SubElement(channel, "title").text = title  
+    ET.SubElement(channel, "link").text = "https://evilgodfahim.github.io/"  
+    ET.SubElement(channel, "description").text = f"{title} generated by script"  
 
-def write_rss(items, file_path, title="Feed"):
-    """Write items to RSS XML"""
-    rss = ET.Element("rss", version="2.0")
-    channel = ET.SubElement(rss, "channel")
-    ET.SubElement(channel, "title").text = title
-    ET.SubElement(channel, "link").text = "https://evilgodfahim.github.io/"
-    ET.SubElement(channel, "description").text = f"{title} generated by script"
+    for item in items:  
+        it = ET.SubElement(channel, "item")  
+        ET.SubElement(it, "title").text = item["title"]  
+        ET.SubElement(it, "link").text = item["link"]  
+        ET.SubElement(it, "description").text = item["description"]  
+        ET.SubElement(it, "pubDate").text = item["pubDate"].strftime("%a, %d %b %Y %H:%M:%S %z")  
 
-    for item in items:
-        it = ET.SubElement(channel, "item")
-        ET.SubElement(it, "title").text = item["title"]
-        ET.SubElement(it, "link").text = item["link"]
-        ET.SubElement(it, "description").text = item["description"]
-        ET.SubElement(it, "pubDate").text = item["pubDate"].strftime("%a, %d %b %Y %H:%M:%S %z")
+    xml_str = minidom.parseString(ET.tostring(rss)).toprettyxml(indent="  ")  
+    with open(file_path, "w", encoding="utf-8") as f:  
+        f.write(xml_str)  
 
-    # Pretty print
-    xml_str = minidom.parseString(ET.tostring(rss)).toprettyxml(indent="  ")
-    with open(file_path, "w", encoding="utf-8") as f:
-        f.write(xml_str)
+# -----------------------------  
+# MASTER FEED UPDATE  
+# -----------------------------  
+def update_master():  
+    print("[Updating feed_master.xml]")  
+    existing = load_existing(MASTER_FILE)  
+    existing_links = {x["link"] for x in existing}  
+    new_items = []  
 
-# -----------------------------
-# MASTER FEED UPDATE
-# -----------------------------
-def update_master():
-    print("[Updating feed_master.xml]")
-    existing = load_existing(MASTER_FILE)
-    existing_links = {x["link"] for x in existing}
-    new_items = []
-
-    for url in FEEDS:
-        try:
-            feed = feedparser.parse(url)
-            for entry in feed.entries:
-                link = getattr(entry, "link", "")
+    for url in FEEDS:  
+        try:  
+            feed = feedparser.parse(url)  
+            for entry in feed.entries:  
+                link = getattr(entry, "link", "")  
                 if link and link not in existing_links:
-                    new_items.append({
-                        "title": getattr(entry, "title", "No Title"),
-                        "link": link,
-                        "description": getattr(entry, "summary", ""),
-                        "pubDate": parse_date(entry)
-                    })
-        except Exception as e:
-            print(f"Error parsing {url}: {e}")
 
-    all_items = existing + new_items
-    all_items.sort(key=lambda x: x["pubDate"], reverse=True)
-    all_items = all_items[:MAX_ITEMS]
+                    source = extract_source(link)
+                    title = getattr(entry, "title", "No Title")
+                    title = f"{title} [ {source} ]"
 
-    # Ensure at least one dummy item if empty
-    if not all_items:
-        all_items = [{
-            "title": "No articles yet",
-            "link": "https://evilgodfahim.github.io/",
-            "description": "Master feed will populate after first successful fetch.",
-            "pubDate": datetime.now(timezone.utc)
-        }]
+                    new_items.append({  
+                        "title": title,  
+                        "link": link,  
+                        "description": getattr(entry, "summary", ""),  
+                        "pubDate": parse_date(entry)  
+                    })  
+        except Exception as e:  
+            print(f"Error parsing {url}: {e}")  
 
-    write_rss(all_items, MASTER_FILE, title="Master Feed (Updated every 30 mins)")
-    print(f"✅ feed_master.xml updated with {len(all_items)} items")
+    all_items = existing + new_items  
+    all_items.sort(key=lambda x: x["pubDate"], reverse=True)  
+    all_items = all_items[:MAX_ITEMS]  
 
-# -----------------------------
-# DAILY FEED UPDATE
-# -----------------------------
-def update_daily():
-    print("[Updating daily_feed.xml]")
-    from_zone = timezone.utc
-    to_zone = timezone(timedelta(hours=BD_OFFSET))
+    if not all_items:  
+        all_items = [{  
+            "title": "No articles yet",  
+            "link": "https://evilgodfahim.github.io/",  
+            "description": "Master feed will populate after first successful fetch.",  
+            "pubDate": datetime.now(timezone.utc)  
+        }]  
 
-    # Load last seen
-    if os.path.exists(LAST_SEEN_FILE):
-        with open(LAST_SEEN_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            last_seen = data.get("last_seen")
-            if last_seen:
-                last_seen_dt = datetime.fromisoformat(last_seen)
-            else:
-                last_seen_dt = None
-    else:
-        last_seen_dt = None
+    write_rss(all_items, MASTER_FILE, title="Master Feed (Updated every 30 mins)")  
+    print(f"✅ feed_master.xml updated with {len(all_items)} items")  
 
-    master_items = load_existing(MASTER_FILE)
-    new_items = []
-    for item in master_items:
-        pub = item["pubDate"].astimezone(to_zone)
-        if not last_seen_dt or pub > last_seen_dt:
-            new_items.append(item)
+# -----------------------------  
+# DAILY FEED UPDATE  
+# -----------------------------  
+def update_daily():  
+    print("[Updating daily_feed.xml]")  
+    from_zone = timezone.utc  
+    to_zone = timezone(timedelta(hours=BD_OFFSET))  
 
-    if not new_items:
-        new_items = [{
-            "title": "No new articles today",
-            "link": "https://evilgodfahim.github.io/",
-            "description": "Daily feed will populate after first articles appear.",
-            "pubDate": datetime.now(timezone.utc)
-        }]
+    if os.path.exists(LAST_SEEN_FILE):  
+        with open(LAST_SEEN_FILE, "r", encoding="utf-8") as f:  
+            data = json.load(f)  
+            last_seen = data.get("last_seen")  
+            if last_seen:  
+                last_seen_dt = datetime.fromisoformat(last_seen)  
+            else:  
+                last_seen_dt = None  
+    else:  
+        last_seen_dt = None  
 
-    write_rss(new_items, DAILY_FILE, title="Daily Feed (Updated 9 AM BD)")
+    master_items = load_existing(MASTER_FILE)  
+    new_items = []  
+    for item in master_items:  
+        pub = item["pubDate"].astimezone(to_zone)  
+        if not last_seen_dt or pub > last_seen_dt:  
+            new_items.append(item)  
 
-    # Save last seen
-    last_dt = max([i["pubDate"] for i in new_items])
-    with open(LAST_SEEN_FILE, "w", encoding="utf-8") as f:
-        json.dump({"last_seen": last_dt.isoformat()}, f)
+    if not new_items:  
+        new_items = [{  
+            "title": "No new articles today",  
+            "link": "https://evilgodfahim.github.io/",  
+            "description": "Daily feed will populate after first articles appear.",  
+            "pubDate": datetime.now(timezone.utc)  
+        }]  
 
-    print(f"✅ daily_feed.xml updated with {len(new_items)} items")
+    write_rss(new_items, DAILY_FILE, title="Daily Feed (Updated 9 AM BD)")  
 
-# -----------------------------
-# MAIN
-# -----------------------------
-if __name__ == "__main__":
-    args = sys.argv[1:]
-    if "--master-only" in args:
-        update_master()
-    elif "--daily-only" in args:
-        update_daily()
-    else:
-        update_master()
+    last_dt = max([i["pubDate"] for i in new_items])  
+    with open(LAST_SEEN_FILE, "w", encoding="utf-8") as f:  
+        json.dump({"last_seen": last_dt.isoformat()}, f)  
+
+    print(f"✅ daily_feed.xml updated with {len(new_items)} items")  
+
+# -----------------------------  
+# MAIN  
+# -----------------------------  
+if __name__ == "__main__":  
+    args = sys.argv[1:]  
+    if "--master-only" in args:  
+        update_master()  
+    elif "--daily-only" in args:  
+        update_daily()  
+    else:  
+        update_master()  
         update_daily()
