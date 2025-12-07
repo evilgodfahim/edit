@@ -35,7 +35,7 @@ FEEDS = [
     "https://politepol.com/fd/wUSywgW7UoCL.xml",
     "https://politepol.com/fd/a18TrHXs0awo.xml",
     "https://politepol.com/fd/nqB5lyvhHzWI.xml",
-"https://evilgodfahim.github.io/ds/articles.xml"
+    "https://evilgodfahim.github.io/ds/articles.xml"
 ]
 
 MASTER_FILE = "feed_master.xml"
@@ -64,7 +64,10 @@ def parse_date(entry):
         t = getattr(entry, f, None)
         if t:
             return datetime(*t[:6], tzinfo=timezone.utc)
-    return datetime.now(timezone.utc)
+
+    # minimal correction: stable UTC fallback
+    return datetime.utcnow().replace(tzinfo=timezone.utc)
+
 
 def load_existing(path):
     if not os.path.exists(path):
@@ -83,6 +86,7 @@ def load_existing(path):
         except:
             continue
     return items
+
 
 def write_rss(items, path, title="Feed"):
     rss = ET.Element("rss", version="2.0")
@@ -108,6 +112,7 @@ def write_rss(items, path, title="Feed"):
 def extract_source(link):
     try:
         host = link.split("/")[2].lower().replace("www.", "")
+        # minimal correction: preserve primary domain consistently
         return host.split(".")[0]
     except:
         return "unknown"
