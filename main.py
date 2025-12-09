@@ -42,10 +42,10 @@ FEEDS = [
 
 MASTER_FILE = "feed_master.xml"
 DAILY_FILE = "daily_feed.xml"
-SEEN_FILE = "seen_ids.json"  # Replaces last_seen timestamp file
+SEEN_FILE = "seen_ids.json"
 
 MAX_ITEMS = 500
-MAX_SEEN_HISTORY = 2000 # Keep memory from growing forever
+MAX_SEEN_HISTORY = 2000
 
 # -----------------------------
 # UTILITIES
@@ -58,21 +58,10 @@ def clean_html(text):
     return text
 
 def get_unique_id(entry):
-    """
-    Waterfall strategy for IDs:
-    1. GUID (Best)
-    2. Link (Okay)
-    3. Hash of Title+Date (Fallback)
-    """
-    # 1. Try GUID
     if hasattr(entry, 'id') and entry.id:
         return entry.id
-    
-    # 2. Try Link
     if hasattr(entry, 'link') and entry.link:
         return entry.link
-    
-    # 3. Fallback Hash
     title = getattr(entry, 'title', '')
     published = getattr(entry, 'published', '')
     unique_string = f"{title}{published}"
@@ -84,8 +73,6 @@ def parse_date(entry):
         t = getattr(entry, f, None)
         if t:
             return datetime(*t[:6], tzinfo=timezone.utc)
-    
-    # Fallback: 1970 (so undated articles sink to bottom instead of top)
     return datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 def extract_source(link):
@@ -111,25 +98,20 @@ def load_existing(path):
                 link = it.find("link").text or ""
                 desc = it.find("description").text or ""
                 pub = it.find("pubDate").text or ""
-                
-                # Try to read the GUID we saved, or fallback to link
                 guid_node = it.find("guid")
                 guid = guid_node.text if guid_node is not None else link
-
                 dt = datetime.strptime(pub, "%a, %d %b %Y %H:%M:%S %z")
-                
                 items.append({
-                    "title": title, 
-                    "link": link, 
-                    "description": desc, 
+                    "title": title,
+                    "link": link,
+                    "description": desc,
                     "pubDate": dt,
                     "id": guid
                 })
-            except Exception:
+            except:
                 continue
         return items
-    except Exception as e:
-        print(f"Error loading {path}: {e}")
+    except:
         return []
 
 def write_rss(items, path, title="Feed"):
@@ -145,8 +127,6 @@ def write_rss(items, path, title="Feed"):
         ET.SubElement(node, "link").text = it["link"]
         ET.SubElement(node, "description").text = it["description"]
         ET.SubElement(node, "pubDate").text = it["pubDate"].strftime("%a, %d %b %Y %H:%M:%S %z")
-        
-        # Save the unique ID so we can recognize it later
         guid = ET.SubElement(node, "guid")
         guid.text = it.get("id", it["link"])
         guid.set("isPermaLink", "false")
@@ -156,35 +136,44 @@ def write_rss(items, path, title="Feed"):
         f.write(xml_str)
 
 # -----------------------------
+# UNIQUE TIMESTAMP ENFORCER
+# -----------------------------
+def enforce_unique_timestamps(items):
+    items.sort(key=lambda x: x["pubDate"], reverse=True)
+    last_time = None
+    for it in items:
+        t = it["pubDate"]
+        if last_time is None:
+            last_time = t
+            continue
+        if t >= last_time:
+            t = last_time - timedelta(seconds=1)
+            it["pubDate"] = t
+        last_time = t
+    return items
+
+# -----------------------------
 # LOGIC: MASTER FEED
 # -----------------------------
 def update_master():
-    print("[Updating feed_master.xml]")
     existing = load_existing(MASTER_FILE)
-    
-    # Use IDs for seen check, not just links
     seen_ids = {x["id"] for x in existing}
     new_items = []
 
     for url in FEEDS:
         try:
             feed = feedparser.parse(url)
-            # Loop inside try/except so one bad article doesn't kill the feed
             for entry in feed.entries:
                 try:
-                    # Generate robust ID
                     entry_id = get_unique_id(entry)
-                    
                     if entry_id not in seen_ids:
                         link = getattr(entry, "link", "")
                         raw_title = getattr(entry, "title", "No Title")
                         raw_desc = getattr(entry, "summary", "")
-                        
                         clean_title = clean_html(raw_title)
                         clean_desc = clean_html(raw_desc)
                         source = extract_source(link)
                         final_title = f"{clean_title}. [ {source} ]"
-
                         new_items.append({
                             "title": final_title,
                             "link": link,
@@ -192,20 +181,17 @@ def update_master():
                             "pubDate": parse_date(entry),
                             "id": entry_id
                         })
-                        seen_ids.add(entry_id) # Prevent dupes within same run
-                except Exception as inner_e:
-                    # Skip only this specific bad article
+                        seen_ids.add(entry_id)
+                except:
                     continue
-                    
-        except Exception as e:
-            print(f"Error fetching {url}: {e}")
+        except:
+            continue
 
     all_items = existing + new_items
-    all_items.sort(key=lambda x: x["pubDate"], reverse=True)
+    all_items = enforce_unique_timestamps(all_items)
     all_items = all_items[:MAX_ITEMS]
 
     if not all_items:
-        # Fallback if empty
         all_items = [{
             "title": "No articles yet",
             "link": "https://evilgodfahim.github.io/",
@@ -215,15 +201,11 @@ def update_master():
         }]
 
     write_rss(all_items, MASTER_FILE, "Master Feed (Updated every 30 mins)")
-    print(f"✓ feed_master.xml updated with {len(all_items)} items")
 
 # -----------------------------
 # LOGIC: DAILY FEED
 # -----------------------------
 def update_daily():
-    print("[Updating daily_feed.xml]")
-
-    # 1. Load history of IDs we have already put in the daily feed
     if os.path.exists(SEEN_FILE):
         with open(SEEN_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -231,27 +213,17 @@ def update_daily():
     else:
         history_ids = set()
 
-    # 2. Load Master Feed
     master = load_existing(MASTER_FILE)
-
-    # 3. Find items that we haven't seen yet
-    daily_items = []
-    
-    # Sort master by date so we process oldest-new items first (optional preference)
-    # or keep reverse=True to show newest first.
     master.sort(key=lambda x: x["pubDate"], reverse=True)
 
+    daily_items = []
     for it in master:
-        # If this ID is NOT in our history, it is new for today
         if it["id"] not in history_ids:
-            # Clean text again just in case
             it["title"] = clean_html(it["title"])
             it["description"] = clean_html(it["description"])
-            
             daily_items.append(it)
             history_ids.add(it["id"])
 
-    # 4. Handle Empty Case
     if not daily_items:
         daily_items = [{
             "title": "No new articles right now",
@@ -261,15 +233,11 @@ def update_daily():
             "id": f"msg_{datetime.now().timestamp()}"
         }]
     else:
-        print(f"✓ Found {len(daily_items)} new items for Daily Feed")
+        daily_items = enforce_unique_timestamps(daily_items)
 
-    # 5. Write Daily Feed
     write_rss(daily_items, DAILY_FILE, "Daily Feed (New Items Only)")
 
-    # 6. Save History (Trim to prevent infinite growth)
-    # Convert set back to list, keep last N items
     updated_history = list(history_ids)[-MAX_SEEN_HISTORY:]
-    
     with open(SEEN_FILE, "w", encoding="utf-8") as f:
         json.dump({"seen_ids": updated_history}, f)
 
