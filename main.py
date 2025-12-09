@@ -136,20 +136,34 @@ def write_rss(items, path, title="Feed"):
         f.write(xml_str)
 
 # -----------------------------
-# UNIQUE TIMESTAMP ENFORCER
+# HASH-BASED UNIQUE TIMESTAMPS
 # -----------------------------
-def enforce_unique_timestamps(items):
-    items.sort(key=lambda x: x["pubDate"], reverse=True)
-    last_time = None
-    for it in items:
-        t = it["pubDate"]
-        if last_time is None:
-            last_time = t
-            continue
-        if t >= last_time:
-            t = last_time - timedelta(seconds=1)
-            it["pubDate"] = t
-        last_time = t
+def adjust_duplicate_timestamps(items):
+    """
+    Adjusts timestamps using hash-based offsets for deterministic, stable uniqueness.
+    Articles with duplicate timestamps get a consistent offset based on their link hash.
+    """
+    from collections import defaultdict
+    
+    # Group items by their original timestamp
+    timestamp_groups = defaultdict(list)
+    for item in items:
+        timestamp_groups[item["pubDate"]].append(item)
+    
+    # Process each group of duplicates
+    for original_dt, group in timestamp_groups.items():
+        if len(group) > 1:
+            # Sort by link to ensure consistent ordering
+            group.sort(key=lambda x: x["link"])
+            
+            for item in group:
+                # Generate hash-based offset (0-59 seconds)
+                link_hash = hashlib.md5(item["link"].encode('utf-8')).hexdigest()
+                offset_seconds = int(link_hash[:8], 16) % 60
+                
+                # Apply offset
+                item["pubDate"] = original_dt + timedelta(seconds=offset_seconds)
+    
     return items
 
 # -----------------------------
@@ -188,7 +202,12 @@ def update_master():
             continue
 
     all_items = existing + new_items
-    all_items = enforce_unique_timestamps(all_items)
+    
+    # Apply hash-based timestamp adjustments to ensure uniqueness
+    all_items = adjust_duplicate_timestamps(all_items)
+    
+    # Sort by timestamp (newest first) AFTER adjustment
+    all_items.sort(key=lambda x: x["pubDate"], reverse=True)
     all_items = all_items[:MAX_ITEMS]
 
     if not all_items:
@@ -232,8 +251,6 @@ def update_daily():
             "pubDate": datetime.now(timezone.utc),
             "id": f"msg_{datetime.now().timestamp()}"
         }]
-    else:
-        daily_items = enforce_unique_timestamps(daily_items)
 
     write_rss(daily_items, DAILY_FILE, "Daily Feed (New Items Only)")
 
