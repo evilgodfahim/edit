@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import feedparser
 import os
 import sys
@@ -6,6 +9,7 @@ import xml.etree.ElementTree as ET
 from xml.dom import minidom
 import json
 import hashlib
+from email.utils import parsedate_to_datetime
 
 # -----------------------------
 # CONFIGURATION
@@ -58,28 +62,68 @@ def clean_html(text):
     return text
 
 def get_unique_id(entry):
-    if hasattr(entry, 'id') and entry.id:
-        return entry.id
-    if hasattr(entry, 'link') and entry.link:
-        return entry.link
-    title = getattr(entry, 'title', '')
-    published = getattr(entry, 'published', '')
+    # feedparser entries may be dict-like or object-like
+    try:
+        eid = entry.get("id") if isinstance(entry, dict) else getattr(entry, "id", None)
+    except Exception:
+        eid = None
+    if eid:
+        return str(eid)
+    try:
+        link = entry.get("link") if isinstance(entry, dict) else getattr(entry, "link", None)
+    except Exception:
+        link = None
+    if link:
+        return str(link)
+    title = entry.get("title", "") if isinstance(entry, dict) else getattr(entry, "title", "")
+    published = entry.get("published", "") if isinstance(entry, dict) else getattr(entry, "published", "")
     unique_string = f"{title}{published}"
     return hashlib.md5(unique_string.encode('utf-8')).hexdigest()
 
 def parse_date(entry):
-    fields = ["published_parsed", "updated_parsed", "created_parsed"]
-    for f in fields:
-        t = getattr(entry, f, None)
+    """
+    Robust parse: try structured times, RFC dates, then fallback to now (UTC).
+    Returns timezone-aware datetime in UTC.
+    """
+    # 1) structured parsed tuples
+    for field in ("published_parsed", "updated_parsed", "created_parsed"):
+        try:
+            t = entry.get(field) if isinstance(entry, dict) else getattr(entry, field, None)
+        except Exception:
+            t = None
         if t:
-            return datetime(*t[:6], tzinfo=timezone.utc)
-    return datetime(1970, 1, 1, tzinfo=timezone.utc)
+            try:
+                return datetime(*t[:6], tzinfo=timezone.utc)
+            except Exception:
+                pass
+
+    # 2) string fields via parsedate_to_datetime
+    for key in ("published", "updated", "pubDate", "created"):
+        try:
+            val = entry.get(key) if isinstance(entry, dict) else getattr(entry, key, None)
+        except Exception:
+            val = None
+        if val:
+            try:
+                dt = parsedate_to_datetime(val)
+                if dt is None:
+                    continue
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return dt.astimezone(timezone.utc)
+            except Exception:
+                continue
+
+    # 3) fallback to now (UTC) — important to avoid epoch dates for missing values
+    return datetime.now(timezone.utc)
 
 def extract_source(link):
     try:
+        if not link:
+            return "unknown"
         host = link.split("/")[2].lower().replace("www.", "")
         return host.split(".")[0]
-    except:
+    except Exception:
         return "unknown"
 
 # -----------------------------
@@ -94,13 +138,37 @@ def load_existing(path):
         items = []
         for it in root.findall(".//item"):
             try:
-                title = it.find("title").text or ""
-                link = it.find("link").text or ""
-                desc = it.find("description").text or ""
-                pub = it.find("pubDate").text or ""
+                title_node = it.find("title")
+                link_node = it.find("link")
+                desc_node = it.find("description")
+                pub_node = it.find("pubDate")
                 guid_node = it.find("guid")
-                guid = guid_node.text if guid_node is not None else link
-                dt = datetime.strptime(pub, "%a, %d %b %Y %H:%M:%S %z")
+
+                title = title_node.text.strip() if title_node is not None and title_node.text else ""
+                link = link_node.text.strip() if link_node is not None and link_node.text else ""
+                desc = desc_node.text if desc_node is not None and desc_node.text else ""
+                guid = guid_node.text.strip() if guid_node is not None and guid_node.text else link or ""
+
+                pub_text = pub_node.text.strip() if pub_node is not None and pub_node.text else None
+                if pub_text:
+                    try:
+                        dt = parsedate_to_datetime(pub_text)
+                        if dt is None:
+                            dt = datetime.now(timezone.utc)
+                        elif dt.tzinfo is None:
+                            dt = dt.replace(tzinfo=timezone.utc)
+                        dt = dt.astimezone(timezone.utc)
+                    except Exception:
+                        try:
+                            dt = datetime.strptime(pub_text, "%a, %d %b %Y %H:%M:%S %z")
+                        except Exception:
+                            dt = datetime.now(timezone.utc)
+                else:
+                    dt = datetime.now(timezone.utc)
+
+                # normalize microseconds away
+                dt = dt.replace(microsecond=0)
+
                 items.append({
                     "title": title,
                     "link": link,
@@ -108,10 +176,10 @@ def load_existing(path):
                     "pubDate": dt,
                     "id": guid
                 })
-            except:
+            except Exception:
                 continue
         return items
-    except:
+    except Exception:
         return []
 
 def write_rss(items, path, title="Feed"):
@@ -123,12 +191,23 @@ def write_rss(items, path, title="Feed"):
 
     for it in items:
         node = ET.SubElement(ch, "item")
-        ET.SubElement(node, "title").text = it["title"]
-        ET.SubElement(node, "link").text = it["link"]
-        ET.SubElement(node, "description").text = it["description"]
-        ET.SubElement(node, "pubDate").text = it["pubDate"].strftime("%a, %d %b %Y %H:%M:%S %z")
+        ET.SubElement(node, "title").text = it.get("title", "")
+        ET.SubElement(node, "link").text = it.get("link", "")
+        ET.SubElement(node, "description").text = it.get("description", "")
+        pub_dt = it.get("pubDate")
+        if isinstance(pub_dt, datetime):
+            # ensure tz-aware
+            try:
+                if pub_dt.tzinfo is None:
+                    pub_dt = pub_dt.replace(tzinfo=timezone.utc)
+                pub_text = pub_dt.strftime("%a, %d %b %Y %H:%M:%S %z")
+            except Exception:
+                pub_text = pub_dt.strftime("%a, %d %b %Y %H:%M:%S +0000")
+        else:
+            pub_text = str(pub_dt)
+        ET.SubElement(node, "pubDate").text = pub_text
         guid = ET.SubElement(node, "guid")
-        guid.text = it.get("id", it["link"])
+        guid.text = it.get("id", it.get("link", ""))
         guid.set("isPermaLink", "false")
 
     xml_str = minidom.parseString(ET.tostring(rss)).toprettyxml(indent="  ")
@@ -142,28 +221,73 @@ def adjust_duplicate_timestamps(items):
     """
     Adjusts timestamps using hash-based offsets for deterministic, stable uniqueness.
     Articles with duplicate timestamps get a consistent offset based on their link hash.
+    Ensures:
+    - timestamps normalized to UTC and seconds precision
+    - deterministic offsets per link
+    - final global uniqueness (increment by 1 second when hash-collisions occur)
     """
     from collections import defaultdict
-    
-    # Group items by their original timestamp
+
+    # Normalize all timestamps: ensure timezone-aware UTC and remove microseconds
+    for item in items:
+        dt = item.get("pubDate")
+        if not isinstance(dt, datetime):
+            try:
+                # attempt to coerce various types, otherwise set now
+                dt = parsedate_to_datetime(str(dt))
+                if dt is None:
+                    raise ValueError
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                dt = dt.astimezone(timezone.utc)
+            except Exception:
+                dt = datetime.now(timezone.utc)
+        else:
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            else:
+                try:
+                    dt = dt.astimezone(timezone.utc)
+                except Exception:
+                    dt = dt.replace(tzinfo=timezone.utc)
+        item["pubDate"] = dt.replace(microsecond=0)
+
+    # Group items by their normalized timestamp
     timestamp_groups = defaultdict(list)
     for item in items:
         timestamp_groups[item["pubDate"]].append(item)
-    
-    # Process each group of duplicates
+
+    # First pass: propose offsets for groups with multiple items
     for original_dt, group in timestamp_groups.items():
         if len(group) > 1:
-            # Sort by link to ensure consistent ordering
-            group.sort(key=lambda x: x["link"])
-            
+            group.sort(key=lambda x: x.get("link", "") or x.get("id", ""))
             for item in group:
-                # Generate hash-based offset (0-59 seconds)
-                link_hash = hashlib.md5(item["link"].encode('utf-8')).hexdigest()
-                offset_seconds = int(link_hash[:8], 16) % 60
-                
-                # Apply offset
-                item["pubDate"] = original_dt + timedelta(seconds=offset_seconds)
-    
+                link_val = (item.get("link") or item.get("id") or "")
+                # Deterministic offset from link hash in range 0..299 seconds
+                link_hash = hashlib.md5(link_val.encode('utf-8')).hexdigest()
+                offset_seconds = int(link_hash[:8], 16) % 300
+                item["_proposed_dt"] = original_dt + timedelta(seconds=offset_seconds)
+        else:
+            group[0]["_proposed_dt"] = original_dt
+
+    # Second pass: ensure global uniqueness by bumping collisions by +1 second as needed
+    used = set()
+    all_items = list(items)
+    all_items.sort(key=lambda x: (x.get("_proposed_dt", x["pubDate"]), x.get("link", "") or x.get("id", "")))
+
+    for itm in all_items:
+        prop = itm.get("_proposed_dt", itm["pubDate"])
+        if prop.tzinfo is None:
+            prop = prop.replace(tzinfo=timezone.utc)
+        prop = prop.replace(microsecond=0).astimezone(timezone.utc)
+
+        while prop in used:
+            prop = prop + timedelta(seconds=1)
+        used.add(prop)
+        itm["pubDate"] = prop
+        if "_proposed_dt" in itm:
+            del itm["_proposed_dt"]
+
     return items
 
 # -----------------------------
@@ -181,9 +305,9 @@ def update_master():
                 try:
                     entry_id = get_unique_id(entry)
                     if entry_id not in seen_ids:
-                        link = getattr(entry, "link", "")
-                        raw_title = getattr(entry, "title", "No Title")
-                        raw_desc = getattr(entry, "summary", "")
+                        link = entry.get("link") if isinstance(entry, dict) else getattr(entry, "link", "")
+                        raw_title = entry.get("title") if isinstance(entry, dict) else getattr(entry, "title", "No Title")
+                        raw_desc = entry.get("summary") if isinstance(entry, dict) else getattr(entry, "summary", "")
                         clean_title = clean_html(raw_title)
                         clean_desc = clean_html(raw_desc)
                         source = extract_source(link)
@@ -196,16 +320,16 @@ def update_master():
                             "id": entry_id
                         })
                         seen_ids.add(entry_id)
-                except:
+                except Exception:
                     continue
-        except:
+        except Exception:
             continue
 
     all_items = existing + new_items
-    
+
     # Apply hash-based timestamp adjustments to ensure uniqueness
     all_items = adjust_duplicate_timestamps(all_items)
-    
+
     # Sort by timestamp (newest first) AFTER adjustment
     all_items.sort(key=lambda x: x["pubDate"], reverse=True)
     all_items = all_items[:MAX_ITEMS]
@@ -215,7 +339,7 @@ def update_master():
             "title": "No articles yet",
             "link": "https://evilgodfahim.github.io/",
             "description": "Master feed will populate after first successful fetch.",
-            "pubDate": datetime.now(timezone.utc),
+            "pubDate": datetime.now(timezone.utc).replace(microsecond=0),
             "id": "init_1"
         }]
 
@@ -226,9 +350,12 @@ def update_master():
 # -----------------------------
 def update_daily():
     if os.path.exists(SEEN_FILE):
-        with open(SEEN_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            history_ids = set(data.get("seen_ids", []))
+        try:
+            with open(SEEN_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                history_ids = set(data.get("seen_ids", []))
+        except Exception:
+            history_ids = set()
     else:
         history_ids = set()
 
@@ -248,15 +375,19 @@ def update_daily():
             "title": "No new articles right now",
             "link": "https://evilgodfahim.github.io/",
             "description": "Check back later.",
-            "pubDate": datetime.now(timezone.utc),
-            "id": f"msg_{datetime.now().timestamp()}"
+            "pubDate": datetime.now(timezone.utc).replace(microsecond=0),
+            "id": f"msg_{int(datetime.now(timezone.utc).timestamp())}"
         }]
 
     write_rss(daily_items, DAILY_FILE, "Daily Feed (New Items Only)")
 
+    # Persist only the most recent seen IDs (order not guaranteed due to set -> list)
     updated_history = list(history_ids)[-MAX_SEEN_HISTORY:]
-    with open(SEEN_FILE, "w", encoding="utf-8") as f:
-        json.dump({"seen_ids": updated_history}, f)
+    try:
+        with open(SEEN_FILE, "w", encoding="utf-8") as f:
+            json.dump({"seen_ids": updated_history}, f)
+    except Exception:
+        pass
 
 # -----------------------------
 # MAIN
