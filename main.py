@@ -39,7 +39,9 @@ FEEDS = [
     "https://politepol.com/fd/wUSywgW7UoCL.xml",
     "https://politepol.com/fd/a18TrHXs0awo.xml",
     "https://politepol.com/fd/nqB5lyvhHzWI.xml",
-    "https://evilgodfahim.github.io/ds/articles.xml",
+    "https://evilgodfahim.github.io/ds/opinion.xml",
+
+"https://evilgodfahim.github.io/ds/editorial.xml"
     "https://politepol.com/fd/8R6kYL0taEqD.xml",
     "https://evilgodfahim.github.io/fedit/feed.xml",
 "https://politepol.com/fd/wjvHK2ovRT07.xml",
