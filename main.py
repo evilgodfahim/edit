@@ -48,11 +48,7 @@ FEEDS = [
 "https://politepaul.com/fd/xgP8bvJjusuL.xml",
 "https://politepaul.com/fd/7InJTyJ6DJEW.xml",
 "https://politepaul.com/fd/aHOZhCiCh6Td.xml",
-"https://evilgodfahim.github.io/ds/deep_dive.xml",
-"https://politepaul.com/fd/swysNOXhpGr1.xml",
-"https://politepaul.com/fd/72CVGMjN8v1U.xml",
-"https://politepaul.com/fd/PTeQe8BUrsju.xml",
-"https://politepaul.com/fd/TqO8I9uftC3E.xml"
+"https://evilgodfahim.github.io/ds/deep_dive.xml"
 ]
 
 MASTER_FILE = "feed_master.xml"
