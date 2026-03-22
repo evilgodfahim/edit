@@ -18,6 +18,7 @@ FEEDS = [
     
 "https://politepaul.com/fd/pzVBxx3Z2fUI.xml",
 "https://politepaul.com/fd/lZysXjRwAlVQ.xml",
+"https://politepaul.com/fd/ekwvBiJQh6be.xml",
 "https://evilgodfahim.github.io/dt/opinion.xml",
 "https://evilgodfahim.github.io/bd24/feeds/feed.xml",
 "https://evilgodfahim.github.io/dsop/feeds/feed.xml",
