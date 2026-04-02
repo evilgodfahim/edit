@@ -9,13 +9,14 @@ import xml.etree.ElementTree as ET
 from xml.dom import minidom
 import json
 import hashlib
+import re
 from email.utils import parsedate_to_datetime
 
 # -----------------------------
 # CONFIGURATION
 # -----------------------------
 FEEDS = [
-    
+
 "https://politepaul.com/fd/pzVBxx3Z2fUI.xml",
 "https://evilgodfahim.github.io/obd/feeds/observer_editorial.xml",
 "https://evilgodfahim.github.io/obd/feeds/observer_opinion.xml",
@@ -63,6 +64,7 @@ FEEDS = [
 MASTER_FILE = "feed_master.xml"
 DAILY_FILE = "daily_feed.xml"
 SEEN_FILE = "seen_ids.json"
+SOURCES_FILE = "sources.txt"
 
 ### >>> EMPTY FEED ADDITION START
 EMPTY_FILE = "empty_feeds.xml"
@@ -384,6 +386,16 @@ def update_daily():
             json.dump({"seen_ids": updated_history}, f)
     except Exception:
         pass
+
+    sources = set()
+    for item in daily_items:
+        m = re.search(r'\[\s*(.+?)\s*\]', item.get("title", ""))
+        if m:
+            sources.add(m.group(1).strip())
+    with open(SOURCES_FILE, "w", encoding="utf-8") as f:
+        for src in sorted(sources):
+            f.write(src + "\n")
+    print(f"✓ sources.txt written with {len(sources)} unique sources")
 
 # -----------------------------
 # EMPTY FEED EXPORT LOGIC
