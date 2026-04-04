@@ -1,7 +1,6 @@
 aljazeera
 archive
 asiatimes
-atlanticcouncil
 bangladeshpost
 bdnews24
 daily-sun
@@ -12,13 +11,11 @@ dhakatribune
 en
 english
 hindustantimes
-indianexpress
 middleeasteye
 newagebd
 observerbd
 tbsnews
 thedailystar
 thefinancialexpress
-thehindu
 tob
 today
