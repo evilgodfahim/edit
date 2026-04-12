@@ -8,6 +8,8 @@ dailynewnation
 dawn
 dhakatribune
 english
+indianexpress
+ipsnews
 middleeasteye
 newagebd
 observerbd
