@@ -13,6 +13,7 @@ ipsnews
 middleeasteye
 newagebd
 observerbd
+responsiblestatecraft
 tbsnews
 thedailystar
 thefinancialexpress
