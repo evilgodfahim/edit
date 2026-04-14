@@ -1,6 +1,4 @@
-asiatimes
 bangladeshpost
-bbc
 bdnews24
 daily-sun
 dailyasianage
@@ -8,6 +6,7 @@ dailynewnation
 dawn
 dhakatribune
 english
+eurasiantimes
 indianexpress
 ipsnews
 middleeasteye
@@ -17,7 +16,7 @@ responsiblestatecraft
 tbsnews
 thedailystar
 thefinancialexpress
-theguardian
 thehindu
+timesofindia
 tob
 today
