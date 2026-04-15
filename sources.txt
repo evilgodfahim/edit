@@ -8,7 +8,6 @@ dhakatribune
 english
 eurasiantimes
 indianexpress
-ipsnews
 middleeasteye
 newagebd
 observerbd
