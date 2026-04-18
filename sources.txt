@@ -8,8 +8,8 @@ dawn
 dhakatribune
 english
 eurasiantimes
-indianexpress
 middleeasteye
+middleeastmonitor
 newagebd
 observerbd
 responsiblestatecraft
