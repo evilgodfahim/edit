@@ -8,7 +8,6 @@ dawn
 dhakatribune
 english
 eurasiantimes
-middleeasteye
 middleeastmonitor
 newagebd
 observerbd
