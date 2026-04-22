@@ -1,4 +1,5 @@
 archive
+asiatimes
 bangladeshpost
 bdnews24
 daily-sun
@@ -7,6 +8,8 @@ dailynewnation
 dawn
 dhakatribune
 english
+hindustantimes
+ipsnews
 middleeasteye
 middleeastmonitor
 newagebd
@@ -15,6 +18,5 @@ tbsnews
 thedailystar
 thefinancialexpress
 thehindu
-timesofindia
 tob
 today
