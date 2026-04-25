@@ -12,12 +12,12 @@ english
 hindustantimes
 ipsnews
 middleeasteye
-middleeastmonitor
 newagebd
 observerbd
 tbsnews
 thedailystar
 thefinancialexpress
+theguardian
 thehindu
 tob
 today
