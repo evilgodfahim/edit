@@ -8,12 +8,11 @@ dailyasianage
 dailynewnation
 dawn
 dhakatribune
-english
 hindustantimes
 ipsnews
-middleeasteye
 newagebd
 observerbd
+scmp
 tbsnews
 thedailystar
 thefinancialexpress
