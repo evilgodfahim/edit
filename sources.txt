@@ -8,7 +8,6 @@ dailynewnation
 dawn
 dhakatribune
 hindustantimes
-ipsnews
 newagebd
 observerbd
 scmp
