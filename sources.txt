@@ -11,6 +11,7 @@ indianexpress
 ipsnews
 newagebd
 observerbd
+southasiamonitor
 tbsnews
 thedailystar
 thefinancialexpress
