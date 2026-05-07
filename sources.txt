@@ -8,7 +8,6 @@ dawn
 dhakatribune
 english
 indianexpress
-ipsnews
 newagebd
 observerbd
 southasiamonitor
