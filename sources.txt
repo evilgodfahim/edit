@@ -8,8 +8,10 @@ dailynewnation
 dawn
 dhakatribune
 english
+ipsnews
 newagebd
 observerbd
+southasiamonitor
 tbsnews
 thedailystar
 thefinancialexpress
