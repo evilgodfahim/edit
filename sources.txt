@@ -9,12 +9,13 @@ dawn
 dhakatribune
 english
 ipsnews
+middleeasteye
 newagebd
 observerbd
-southasiamonitor
 tbsnews
 thedailystar
 thefinancialexpress
 thehindu
+timesofindia
 tob
 today
