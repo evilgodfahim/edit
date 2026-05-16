@@ -1,3 +1,4 @@
+asiatimes
 bangladeshpost
 bdnews24
 daily-sun
@@ -10,6 +11,7 @@ ipsnews
 middleeasteye
 newagebd
 observerbd
+responsiblestatecraft
 tbsnews
 thedailystar
 thefinancialexpress
