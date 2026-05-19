@@ -8,14 +8,13 @@ dawn
 dhakatribune
 english
 ipdefenseforum
-ipsnews
-middleeasteye
 newagebd
 observerbd
 responsiblestatecraft
 tbsnews
 thedailystar
 thefinancialexpress
+theguardian
 thehindu
 tob
 today
