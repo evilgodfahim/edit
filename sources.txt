@@ -1,3 +1,4 @@
+aljazeera
 asiatimes
 bangladeshpost
 bdnews24
@@ -10,7 +11,6 @@ english
 middleeasteye
 newagebd
 observerbd
-southasiamonitor
 tbsnews
 thedailystar
 thefinancialexpress
