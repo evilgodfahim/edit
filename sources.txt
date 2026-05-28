@@ -17,5 +17,6 @@ tbsnews
 thedailystar
 thefinancialexpress
 theguardian
+thehindu
 tob
 today
