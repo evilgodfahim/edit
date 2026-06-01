@@ -1,6 +1,7 @@
 aljazeera
 asiatimes
 bangladeshpost
+bbc
 bdnews24
 daily-sun
 dailyasianage
