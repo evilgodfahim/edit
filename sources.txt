@@ -10,10 +10,11 @@ dawn
 dhakatribune
 english
 eurasiareview
+ipsnews
 middleeasteye
 newagebd
+news
 observerbd
-scmp
 tbsnews
 thedailystar
 thefinancialexpress
