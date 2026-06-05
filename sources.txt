@@ -1,7 +1,6 @@
 aljazeera
 asiatimes
 bangladeshpost
-bbc
 bdnews24
 daily-sun
 dailyasianage
@@ -9,7 +8,6 @@ dailynewnation
 dawn
 dhakatribune
 english
-eurasiareview
 ipsnews
 middleeasteye
 newagebd
