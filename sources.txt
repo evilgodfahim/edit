@@ -14,5 +14,6 @@ observerbd
 tbsnews
 thedailystar
 thefinancialexpress
+thehindu
 tob
 today
