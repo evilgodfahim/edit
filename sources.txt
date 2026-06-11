@@ -1,4 +1,4 @@
-UN: June 5
+aljazeera
 asiatimes
 bangladeshpost
 bdnews24
@@ -8,6 +8,7 @@ dailynewnation
 dawn
 dhakatribune
 english
+ipsnews
 newagebd
 observerbd
 tbsnews
