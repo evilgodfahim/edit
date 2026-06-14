@@ -1,5 +1,4 @@
 aljazeera
-asiatimes
 bangladeshpost
 bdnews24
 chathamhouse
@@ -8,14 +7,11 @@ dailyasianage
 dailynewnation
 dawn
 dhakatribune
-english
-ipsnews
 newagebd
 observerbd
 tbsnews
 thedailystar
 thefinancialexpress
-theguardian
 thehindu
 tob
 today
