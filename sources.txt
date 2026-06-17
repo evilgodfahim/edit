@@ -5,6 +5,7 @@ dailyasianage
 dailynewnation
 dawn
 dhakatribune
+english
 newagebd
 observerbd
 tbsnews
