@@ -1,5 +1,4 @@
 archive
-asiatimes
 bangladeshpost
 bdnews24
 daily-sun
@@ -7,6 +6,8 @@ dailyasianage
 dailynewnation
 dawn
 dhakatribune
+english
+middleeasteye
 newagebd
 observerbd
 tbsnews
