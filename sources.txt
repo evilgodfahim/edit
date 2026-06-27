@@ -5,14 +5,17 @@ dailyasianage
 dailynewnation
 dawn
 dhakatribune
+english
 hindustantimes
 indianexpress
+ipsnews
 middleeasteye
 newagebd
 observerbd
 tbsnews
 thedailystar
 thefinancialexpress
+theguardian
 thehindu
 tob
 today
