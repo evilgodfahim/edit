@@ -1,3 +1,4 @@
+asiatimes
 bangladeshpost
 bdnews24
 daily-sun
@@ -9,7 +10,6 @@ english
 hindustantimes
 indianexpress
 ipsnews
-middleeasteye
 newagebd
 observerbd
 tbsnews
