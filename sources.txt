@@ -7,7 +7,6 @@ dailynewnation
 dawn
 dhakatribune
 english
-hindustantimes
 indianexpress
 ipsnews
 newagebd
