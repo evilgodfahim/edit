@@ -6,9 +6,6 @@ dailyasianage
 dailynewnation
 dawn
 dhakatribune
-english
-indianexpress
-ipsnews
 newagebd
 observerbd
 tbsnews
