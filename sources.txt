@@ -1,15 +1,13 @@
 asiatimes
-bangladeshpost
 bdnews24
 daily-sun
 dailyasianage
 dailynewnation
 dawn
 dhakatribune
-english
-indianexpress
 newagebd
 observerbd
+scmp
 tbsnews
 thedailystar
 thefinancialexpress
