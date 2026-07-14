@@ -11,6 +11,5 @@ newagebd
 observerbd
 tbsnews
 thedailystar
-thefinancialexpress
 tob
 today
