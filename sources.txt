@@ -1,3 +1,4 @@
+archive
 bangladeshpost
 bdnews24
 daily-sun
@@ -6,8 +7,8 @@ dailynewnation
 dawn
 dhakatribune
 english
-eurasiantimes
 eurasiareview
+hindustantimes
 newagebd
 observerbd
 tbsnews
