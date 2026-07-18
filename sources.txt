@@ -6,11 +6,12 @@ dailynewnation
 dawn
 dhakatribune
 english
-hindustantimes
 newagebd
 observerbd
 tbsnews
 thedailystar
+theguardian
 thehindu
+timesofindia
 tob
 today
