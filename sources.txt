@@ -1,4 +1,4 @@
-bangladeshpost
+asiatimes
 bdnews24
 daily-sun
 dailyasianage
@@ -11,7 +11,6 @@ observerbd
 tbsnews
 thedailystar
 theguardian
-thehindu
 timesofindia
 tob
 today
