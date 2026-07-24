@@ -1,4 +1,3 @@
-asiatimes
 bangladeshpost
 bbc
 bdnews24
@@ -7,6 +6,8 @@ dailyasianage
 dailynewnation
 dawn
 dhakatribune
+english
+middleeasteye
 newagebd
 observerbd
 tbsnews
