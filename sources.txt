@@ -3,9 +3,9 @@ bdnews24
 daily-sun
 dailyasianage
 dailynewnation
-dawn
 dhakatribune
 english
+indianexpress
 newagebd
 observerbd
 responsiblestatecraft
