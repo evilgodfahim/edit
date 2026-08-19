@@ -1,3 +1,4 @@
+bangladeshpost
 bdnews24
 daily-sun
 dailyasianage
@@ -6,5 +7,4 @@ dhakatribune
 newagebd
 observerbd
 thedailystar
-tob
 today
