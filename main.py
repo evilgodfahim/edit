@@ -10,6 +10,7 @@ from xml.dom import minidom
 import json
 import hashlib
 import re
+import urllib.request
 from email.utils import parsedate_to_datetime
 
 # -----------------------------
@@ -22,7 +23,7 @@ FEEDS = [
 "https://evilgodfahim.github.io/laqa/feeds/feed.xml",
 "https://evilgodfahim.github.io/obd/feeds/observer_editorial.xml",
 "https://evilgodfahim.github.io/obd/feeds/observer_opinion.xml",
-"https://politepaul.com/fd/NrEWP2V2AGVT.xml", 
+"https://politepaul.com/fd/NrEWP2V2AGVT.xml",
 "https://politepaul.com/fd/lZysXjRwAlVQ.xml",
 "https://politepaul.com/fd/ekwvBiJQh6be.xml",
 "https://evilgodfahim.github.io/dt/opinion.xml",
@@ -65,15 +66,12 @@ FEEDS = [
 ]
 
 MASTER_FILE = "feed_master.xml"
-DAILY_FILE = "daily_feed.xml"
-SEEN_FILE = "seen_ids.json"
+DAILY_FILE  = "daily_feed.xml"
+SEEN_FILE   = "seen_ids.json"
 SOURCES_FILE = "sources.txt"
+EMPTY_FILE  = "empty_feeds.xml"
 
-### >>> EMPTY FEED ADDITION START
-EMPTY_FILE = "empty_feeds.xml"
-### >>> EMPTY FEED ADDITION END
-
-MAX_ITEMS = 500
+MAX_ITEMS        = 500
 MAX_SEEN_HISTORY = 2000
 
 # -----------------------------
@@ -99,10 +97,9 @@ def get_unique_id(entry):
         link = None
     if link:
         return str(link)
-    title = entry.get("title", "") if isinstance(entry, dict) else getattr(entry, "title", "")
+    title     = entry.get("title", "")     if isinstance(entry, dict) else getattr(entry, "title", "")
     published = entry.get("published", "") if isinstance(entry, dict) else getattr(entry, "published", "")
-    unique_string = f"{title}{published}"
-    return hashlib.md5(unique_string.encode('utf-8')).hexdigest()
+    return hashlib.md5(f"{title}{published}".encode("utf-8")).hexdigest()
 
 def parse_date(entry):
     for field in ("published_parsed", "updated_parsed", "created_parsed"):
@@ -142,7 +139,88 @@ def extract_source(link):
         return "unknown"
 
 # -----------------------------
-# XML
+# CUSTOM XML PARSER
+# Handles <article>/<url>/<snippet>/<published> format
+# that feedparser does not understand.
+# -----------------------------
+def parse_custom_xml(url):
+    """
+    Fallback parser for non-RSS/Atom XML feeds that use a custom schema:
+
+        <article>
+            <title>...</title>
+            <url>...</url>
+            <category>...</category>
+            <published/>          ← may be empty
+            <snippet>...</snippet>
+        </article>
+
+    Returns a list of item dicts in the same schema used by update_master()
+    (keys: title, link, description, pubDate, id).
+    Returns [] on any failure or if no <article> elements are found.
+    """
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            raw = resp.read()
+    except Exception:
+        return []
+
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError:
+        return []
+
+    articles = root.findall(".//article")
+    if not articles:
+        return []
+
+    items = []
+    for article in articles:
+        try:
+            def text(tag):
+                node = article.find(tag)
+                return (node.text or "").strip() if node is not None else ""
+
+            title    = text("title") or "No Title"
+            link     = text("url")
+            desc     = text("snippet")
+            pub_text = text("published")
+
+            # <published/> is often empty in this format — fall back to now
+            if pub_text:
+                try:
+                    dt = parsedate_to_datetime(pub_text)
+                    if dt is None:
+                        raise ValueError
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    dt = dt.astimezone(timezone.utc)
+                except Exception:
+                    dt = datetime.now(timezone.utc)
+            else:
+                dt = datetime.now(timezone.utc)
+
+            # ID: title + link + first 80 chars of snippet (link alone is
+            # unreliable here — Cloudflare email-protection URLs aren't unique)
+            entry_id = hashlib.md5(
+                f"{title}{link}{desc[:80]}".encode("utf-8")
+            ).hexdigest()
+
+            items.append({
+                "title":       title,
+                "link":        link,
+                "description": desc,
+                "pubDate":     dt.replace(microsecond=0),
+                "id":          entry_id,
+            })
+        except Exception:
+            continue
+
+    return items
+
+# -----------------------------
+# XML HELPERS
 # -----------------------------
 def load_existing(path):
     if not os.path.exists(path):
@@ -154,14 +232,14 @@ def load_existing(path):
         for it in root.findall(".//item"):
             try:
                 title_node = it.find("title")
-                link_node = it.find("link")
-                desc_node = it.find("description")
-                pub_node = it.find("pubDate")
-                guid_node = it.find("guid")
+                link_node  = it.find("link")
+                desc_node  = it.find("description")
+                pub_node   = it.find("pubDate")
+                guid_node  = it.find("guid")
                 title = title_node.text.strip() if title_node is not None and title_node.text else ""
-                link = link_node.text.strip() if link_node is not None and link_node.text else ""
-                desc = desc_node.text if desc_node is not None and desc_node.text else ""
-                guid = guid_node.text.strip() if guid_node is not None and guid_node.text else link or ""
+                link  = link_node.text.strip()  if link_node  is not None and link_node.text  else ""
+                desc  = desc_node.text          if desc_node  is not None and desc_node.text  else ""
+                guid  = guid_node.text.strip()  if guid_node  is not None and guid_node.text  else link or ""
                 pub_text = pub_node.text.strip() if pub_node is not None and pub_node.text else None
                 if pub_text:
                     try:
@@ -180,11 +258,11 @@ def load_existing(path):
                     dt = datetime.now(timezone.utc)
                 dt = dt.replace(microsecond=0)
                 items.append({
-                    "title": title,
-                    "link": link,
+                    "title":       title,
+                    "link":        link,
                     "description": desc,
-                    "pubDate": dt,
-                    "id": guid
+                    "pubDate":     dt,
+                    "id":          guid
                 })
             except Exception:
                 continue
@@ -194,14 +272,14 @@ def load_existing(path):
 
 def write_rss(items, path, title="Feed"):
     rss = ET.Element("rss", version="2.0")
-    ch = ET.SubElement(rss, "channel")
-    ET.SubElement(ch, "title").text = title
-    ET.SubElement(ch, "link").text = "https://evilgodfahim.github.io/"
+    ch  = ET.SubElement(rss, "channel")
+    ET.SubElement(ch, "title").text       = title
+    ET.SubElement(ch, "link").text        = "https://evilgodfahim.github.io/"
     ET.SubElement(ch, "description").text = f"{title} generated by script"
     for it in items:
         node = ET.SubElement(ch, "item")
-        ET.SubElement(node, "title").text = it.get("title", "")
-        ET.SubElement(node, "link").text = it.get("link", "")
+        ET.SubElement(node, "title").text       = it.get("title", "")
+        ET.SubElement(node, "link").text        = it.get("link", "")
         ET.SubElement(node, "description").text = it.get("description", "")
         pub_dt = it.get("pubDate")
         if isinstance(pub_dt, datetime):
@@ -247,20 +325,23 @@ def adjust_duplicate_timestamps(items):
                 except Exception:
                     dt = dt.replace(tzinfo=timezone.utc)
         item["pubDate"] = dt.replace(microsecond=0)
+
     timestamp_groups = defaultdict(list)
     for item in items:
         timestamp_groups[item["pubDate"]].append(item)
+
     for original_dt, group in timestamp_groups.items():
         if len(group) > 1:
             group.sort(key=lambda x: x.get("link", "") or x.get("id", ""))
             for item in group:
-                link_val = (item.get("link") or item.get("id") or "")
-                link_hash = hashlib.md5(link_val.encode('utf-8')).hexdigest()
-                offset_seconds = int(link_hash[:8], 16) % 300
-                item["_proposed_dt"] = original_dt + timedelta(seconds=offset_seconds)
+                link_val    = (item.get("link") or item.get("id") or "")
+                link_hash   = hashlib.md5(link_val.encode("utf-8")).hexdigest()
+                offset_secs = int(link_hash[:8], 16) % 300
+                item["_proposed_dt"] = original_dt + timedelta(seconds=offset_secs)
         else:
             group[0]["_proposed_dt"] = original_dt
-    used = set()
+
+    used      = set()
     all_items = list(items)
     all_items.sort(key=lambda x: (x.get("_proposed_dt", x["pubDate"]), x.get("link", "") or x.get("id", "")))
     for itm in all_items:
@@ -272,8 +353,8 @@ def adjust_duplicate_timestamps(items):
             prop = prop + timedelta(seconds=1)
         used.add(prop)
         itm["pubDate"] = prop
-        if "_proposed_dt" in itm:
-            del itm["_proposed_dt"]
+        itm.pop("_proposed_dt", None)
+
     return items
 
 # -----------------------------
@@ -282,44 +363,51 @@ def adjust_duplicate_timestamps(items):
 def update_master():
     existing = load_existing(MASTER_FILE)
     seen_ids = {x["id"] for x in existing}
-    new_items = []
-
-    ### >>> EMPTY FEED ADDITION START
+    new_items     = []
     empty_reports = []
-    ### >>> EMPTY FEED ADDITION END
 
     for url in FEEDS:
         try:
-            feed = feedparser.parse(url)
+            feed    = feedparser.parse(url)
+            entries = feed.entries
 
-            ### >>> EMPTY FEED ADDITION START
-            if not feed.entries:
-                empty_reports.append({
-                    "title": f"Empty feed detected: {url}",
-                    "link": url,
-                    "description": "This feed returned no articles.",
-                    "pubDate": datetime.now(timezone.utc).replace(microsecond=0),
-                    "id": f"empty_{hashlib.md5(url.encode()).hexdigest()}"
-                })
-            ### >>> EMPTY FEED ADDITION END
+            # ── Fallback: custom XML (article/url/snippet schema) ──────────
+            if not entries:
+                custom = parse_custom_xml(url)
+                if custom:
+                    for item in custom:
+                        if item["id"] not in seen_ids:
+                            source       = extract_source(item["link"] or url)
+                            item["title"] = f"{clean_html(item['title'])}. [ {source} ]"
+                            item["description"] = clean_html(item["description"])
+                            new_items.append(item)
+                            seen_ids.add(item["id"])
+                else:
+                    # Genuinely empty — nothing in either format
+                    empty_reports.append({
+                        "title":       f"Empty feed detected: {url}",
+                        "link":        url,
+                        "description": "This feed returned no articles.",
+                        "pubDate":     datetime.now(timezone.utc).replace(microsecond=0),
+                        "id":          f"empty_{hashlib.md5(url.encode()).hexdigest()}"
+                    })
+                continue
+            # ───────────────────────────────────────────────────────────────
 
-            for entry in feed.entries:
+            for entry in entries:
                 try:
                     entry_id = get_unique_id(entry)
                     if entry_id not in seen_ids:
-                        link = entry.get("link") if isinstance(entry, dict) else getattr(entry, "link", "")
-                        raw_title = entry.get("title") if isinstance(entry, dict) else getattr(entry, "title", "No Title")
-                        raw_desc = entry.get("summary") if isinstance(entry, dict) else getattr(entry, "summary", "")
-                        clean_title = clean_html(raw_title)
-                        clean_desc = clean_html(raw_desc)
-                        source = extract_source(link)
-                        final_title = f"{clean_title}. [ {source} ]"
+                        link      = entry.get("link")    if isinstance(entry, dict) else getattr(entry, "link",    "")
+                        raw_title = entry.get("title")   if isinstance(entry, dict) else getattr(entry, "title",   "No Title")
+                        raw_desc  = entry.get("summary") if isinstance(entry, dict) else getattr(entry, "summary", "")
+                        source    = extract_source(link)
                         new_items.append({
-                            "title": final_title,
-                            "link": link,
-                            "description": clean_desc,
-                            "pubDate": parse_date(entry),
-                            "id": entry_id
+                            "title":       f"{clean_html(raw_title)}. [ {source} ]",
+                            "link":        link,
+                            "description": clean_html(raw_desc),
+                            "pubDate":     parse_date(entry),
+                            "id":          entry_id
                         })
                         seen_ids.add(entry_id)
                 except Exception:
@@ -334,18 +422,15 @@ def update_master():
 
     if not all_items:
         all_items = [{
-            "title": "No articles yet",
-            "link": "https://evilgodfahim.github.io/",
+            "title":       "No articles yet",
+            "link":        "https://evilgodfahim.github.io/",
             "description": "Master feed will populate after first successful fetch.",
-            "pubDate": datetime.now(timezone.utc).replace(microsecond=0),
-            "id": "init_1"
+            "pubDate":     datetime.now(timezone.utc).replace(microsecond=0),
+            "id":          "init_1"
         }]
 
     write_rss(all_items, MASTER_FILE, "Master Feed (Updated every 30 mins)")
-
-    ### >>> EMPTY FEED ADDITION START
     write_rss(empty_reports, EMPTY_FILE, "Empty Feeds Report")
-    ### >>> EMPTY FEED ADDITION END
 
 # -----------------------------
 # LOGIC: DAILY
@@ -367,21 +452,21 @@ def update_daily():
     daily_items = []
     for it in master:
         if it["id"] not in history_ids:
-            it["title"] = clean_html(it["title"])
+            it["title"]       = clean_html(it["title"])
             it["description"] = clean_html(it["description"])
             daily_items.append(it)
             history_ids.add(it["id"])
 
     if not daily_items:
         daily_items = [{
-            "title": "No new articles right now",
-            "link": "https://evilgodfahim.github.io/",
+            "title":       "No new articles right now",
+            "link":        "https://evilgodfahim.github.io/",
             "description": "Check back later.",
-            "pubDate": datetime.now(timezone.utc).replace(microsecond=0),
-            "id": f"msg_{int(datetime.now(timezone.utc).timestamp())}"
+            "pubDate":     datetime.now(timezone.utc).replace(microsecond=0),
+            "id":          f"msg_{int(datetime.now(timezone.utc).timestamp())}"
         }]
 
-    write_rss(daily_items, DAILY_FILE, "Daily Feed (New Items Only}")
+    write_rss(daily_items, DAILY_FILE, "Daily Feed (New Items Only)")
 
     updated_history = list(history_ids)[-MAX_SEEN_HISTORY:]
     try:
@@ -401,27 +486,27 @@ def update_daily():
     print(f"✓ sources.txt written with {len(sources)} unique sources")
 
 # -----------------------------
-# EMPTY FEED EXPORT LOGIC
+# EMPTY FEED REPORT
 # -----------------------------
-### >>> EMPTY FEED ADDITION START
 def update_empty_feeds():
     reports = []
     for url in FEEDS:
         try:
             feed = feedparser.parse(url)
             if not feed.entries:
-                reports.append({
-                    "title": f"Empty feed detected: {url}",
-                    "link": url,
-                    "description": "This feed returned no articles.",
-                    "pubDate": datetime.now(timezone.utc).replace(microsecond=0),
-                    "id": f"empty_{hashlib.md5(url.encode()).hexdigest()}"
-                })
+                # Only report as empty if custom XML also yields nothing
+                custom = parse_custom_xml(url)
+                if not custom:
+                    reports.append({
+                        "title":       f"Empty feed detected: {url}",
+                        "link":        url,
+                        "description": "This feed returned no articles.",
+                        "pubDate":     datetime.now(timezone.utc).replace(microsecond=0),
+                        "id":          f"empty_{hashlib.md5(url.encode()).hexdigest()}"
+                    })
         except Exception:
             continue
-
     write_rss(reports, EMPTY_FILE, "Empty Feeds Report")
-### >>> EMPTY FEED ADDITION END
 
 # -----------------------------
 # MAIN
@@ -432,10 +517,8 @@ if __name__ == "__main__":
         update_master()
     elif "--daily-only" in args:
         update_daily()
-    ### >>> EMPTY FEED ADDITION START
     elif "--empty-only" in args:
         update_empty_feeds()
-    ### >>> EMPTY FEED ADDITION END
     else:
         update_master()
         update_daily()
