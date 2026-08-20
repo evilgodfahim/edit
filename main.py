@@ -65,14 +65,51 @@ FEEDS = [
 "https://evilgodfahim.github.io/tbs/thoughts.xml"
 ]
 
-MASTER_FILE  = "feed_master.xml"
-DAILY_FILE   = "daily_feed.xml"
-SEEN_FILE    = "seen_ids.json"
-SOURCES_FILE = "sources.txt"
-EMPTY_FILE   = "empty_feeds.xml"
+MASTER_FILE       = "feed_master.xml"
+DAILY_FILE        = "daily_feed.xml"
+SEEN_FILE         = "seen_ids.json"
+SOURCES_FILE      = "sources.txt"
+EMPTY_FILE        = "empty_feeds.xml"
 
-MAX_ITEMS        = 500
-MAX_SEEN_HISTORY = 2000
+MAX_ITEMS          = 500
+SEEN_RETENTION_DAYS = 365   # keep seen IDs for 365 days (was count-based MAX_SEEN_HISTORY=2000)
+
+# -----------------------------
+# SEEN-IDS HELPERS (timestamp-based, 365-day retention)
+# -----------------------------
+def load_seen():
+    """
+    Returns (history_ids: set, history_dict: dict[id -> iso_str]).
+    Supports migration from old list format to new dict format.
+    Drops entries older than SEEN_RETENTION_DAYS.
+    """
+    if not os.path.exists(SEEN_FILE):
+        return set(), {}
+    try:
+        with open(SEEN_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        cutoff  = (datetime.now(timezone.utc) - timedelta(days=SEEN_RETENTION_DAYS)).isoformat()
+        raw     = data.get("seen_ids", [])
+        # ── migrate old list format ──────────────────────────────────────
+        if isinstance(raw, list):
+            now_iso = datetime.now(timezone.utc).isoformat()
+            history = {id_: now_iso for id_ in raw}
+        else:
+            history = {id_: ts for id_, ts in raw.items() if ts >= cutoff}
+        return set(history.keys()), history
+    except Exception:
+        return set(), {}
+
+
+def save_seen(history: dict):
+    """Prune to SEEN_RETENTION_DAYS and persist."""
+    cutoff  = (datetime.now(timezone.utc) - timedelta(days=SEEN_RETENTION_DAYS)).isoformat()
+    pruned  = {id_: ts for id_, ts in history.items() if ts >= cutoff}
+    try:
+        with open(SEEN_FILE, "w", encoding="utf-8") as f:
+            json.dump({"seen_ids": pruned}, f, indent=2)
+    except Exception:
+        pass
 
 # -----------------------------
 # UTILITIES
@@ -471,26 +508,19 @@ def update_master():
 # LOGIC: DAILY
 # -----------------------------
 def update_daily():
-    if os.path.exists(SEEN_FILE):
-        try:
-            with open(SEEN_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                history_ids = set(data.get("seen_ids", []))
-        except Exception:
-            history_ids = set()
-    else:
-        history_ids = set()
+    history_ids, history = load_seen()
 
     master = load_existing(MASTER_FILE)
     master.sort(key=lambda x: x["pubDate"], reverse=True)
 
+    now_iso     = datetime.now(timezone.utc).isoformat()
     daily_items = []
     for it in master:
         if it["id"] not in history_ids:
             it["title"]       = clean_html(it["title"])
             it["description"] = clean_html(it["description"])
             daily_items.append(it)
-            history_ids.add(it["id"])
+            history[it["id"]] = now_iso   # record when we first served this ID
 
     if not daily_items:
         daily_items = [{
@@ -502,13 +532,7 @@ def update_daily():
         }]
 
     write_rss(daily_items, DAILY_FILE, "Daily Feed (New Items Only)")
-
-    updated_history = list(history_ids)[-MAX_SEEN_HISTORY:]
-    try:
-        with open(SEEN_FILE, "w", encoding="utf-8") as f:
-            json.dump({"seen_ids": updated_history}, f)
-    except Exception:
-        pass
+    save_seen(history)   # prunes to SEEN_RETENTION_DAYS automatically
 
     sources = set()
     for item in daily_items:
