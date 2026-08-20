@@ -65,11 +65,11 @@ FEEDS = [
 "https://evilgodfahim.github.io/tbs/thoughts.xml"
 ]
 
-MASTER_FILE = "feed_master.xml"
-DAILY_FILE  = "daily_feed.xml"
-SEEN_FILE   = "seen_ids.json"
+MASTER_FILE  = "feed_master.xml"
+DAILY_FILE   = "daily_feed.xml"
+SEEN_FILE    = "seen_ids.json"
 SOURCES_FILE = "sources.txt"
-EMPTY_FILE  = "empty_feeds.xml"
+EMPTY_FILE   = "empty_feeds.xml"
 
 MAX_ITEMS        = 500
 MAX_SEEN_HISTORY = 2000
@@ -140,24 +140,17 @@ def extract_source(link):
 
 # -----------------------------
 # CUSTOM XML PARSER
-# Handles <article>/<url>/<snippet>/<published> format
-# that feedparser does not understand.
+# Handles two fallback schemas when feedparser returns no entries:
+#   1. Custom <article><url><snippet><published> format
+#   2. Standard RSS <item><link><description><pubDate><guid> format
 # -----------------------------
 def parse_custom_xml(url):
     """
-    Fallback parser for non-RSS/Atom XML feeds that use a custom schema:
-
-        <article>
-            <title>...</title>
-            <url>...</url>
-            <category>...</category>
-            <published/>          ← may be empty
-            <snippet>...</snippet>
-        </article>
-
-    Returns a list of item dicts in the same schema used by update_master()
-    (keys: title, link, description, pubDate, id).
-    Returns [] on any failure or if no <article> elements are found.
+    Fallback parser for when feedparser returns no entries.
+    Tries two schemas in order:
+      1. Custom <article><url><snippet><published>
+      2. Standard RSS <item><link><description><pubDate><guid>
+    Returns [] on any failure or if neither schema yields items.
     """
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -171,23 +164,67 @@ def parse_custom_xml(url):
     except ET.ParseError:
         return []
 
+    # ── Schema 1: custom <article> format ─────────────────────────────────
     articles = root.findall(".//article")
-    if not articles:
+    if articles:
+        items = []
+        for article in articles:
+            try:
+                def text(tag, _el=article):
+                    node = _el.find(tag)
+                    return (node.text or "").strip() if node is not None else ""
+
+                title    = text("title") or "No Title"
+                link     = text("url")
+                desc     = text("snippet")
+                pub_text = text("published")
+
+                if pub_text:
+                    try:
+                        dt = parsedate_to_datetime(pub_text)
+                        if dt is None:
+                            raise ValueError
+                        if dt.tzinfo is None:
+                            dt = dt.replace(tzinfo=timezone.utc)
+                        dt = dt.astimezone(timezone.utc)
+                    except Exception:
+                        dt = datetime.now(timezone.utc)
+                else:
+                    dt = datetime.now(timezone.utc)
+
+                entry_id = hashlib.md5(
+                    f"{title}{link}{desc[:80]}".encode("utf-8")
+                ).hexdigest()
+
+                items.append({
+                    "title":       title,
+                    "link":        link,
+                    "description": desc,
+                    "pubDate":     dt.replace(microsecond=0),
+                    "id":          entry_id,
+                })
+            except Exception:
+                continue
+        return items
+
+    # ── Schema 2: standard RSS <item> format ──────────────────────────────
+    rss_items = root.findall(".//item")
+    if not rss_items:
         return []
 
     items = []
-    for article in articles:
+    for rss_item in rss_items:
         try:
-            def text(tag):
-                node = article.find(tag)
+            def text(tag, _el=rss_item):
+                node = _el.find(tag)
                 return (node.text or "").strip() if node is not None else ""
 
             title    = text("title") or "No Title"
-            link     = text("url")
-            desc     = text("snippet")
-            pub_text = text("published")
+            link     = text("link")
+            desc     = text("description")
+            pub_text = text("pubDate")
+            guid     = text("guid") or link
 
-            # <published/> is often empty in this format — fall back to now
             if pub_text:
                 try:
                     dt = parsedate_to_datetime(pub_text)
@@ -201,10 +238,8 @@ def parse_custom_xml(url):
             else:
                 dt = datetime.now(timezone.utc)
 
-            # ID: title + link + first 80 chars of snippet (link alone is
-            # unreliable here — Cloudflare email-protection URLs aren't unique)
-            entry_id = hashlib.md5(
-                f"{title}{link}{desc[:80]}".encode("utf-8")
+            entry_id = guid or hashlib.md5(
+                f"{title}{link}".encode("utf-8")
             ).hexdigest()
 
             items.append({
@@ -371,13 +406,13 @@ def update_master():
             feed    = feedparser.parse(url)
             entries = feed.entries
 
-            # ── Fallback: custom XML (article/url/snippet schema) ──────────
+            # ── Fallback: custom XML (article/url/snippet or standard RSS) ──
             if not entries:
                 custom = parse_custom_xml(url)
                 if custom:
                     for item in custom:
                         if item["id"] not in seen_ids:
-                            source       = extract_source(item["link"] or url)
+                            source        = extract_source(item["link"] or url)
                             item["title"] = f"{clean_html(item['title'])}. [ {source} ]"
                             item["description"] = clean_html(item["description"])
                             new_items.append(item)
@@ -494,7 +529,6 @@ def update_empty_feeds():
         try:
             feed = feedparser.parse(url)
             if not feed.entries:
-                # Only report as empty if custom XML also yields nothing
                 custom = parse_custom_xml(url)
                 if not custom:
                     reports.append({
