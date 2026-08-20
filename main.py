@@ -70,7 +70,7 @@ SEEN_FILE           = "seen_ids.json"
 SOURCES_FILE        = "sources.txt"
 EMPTY_FILE          = "empty_feeds.xml"
 
-MAX_ITEMS           = 500
+MAX_ITEMS           = 5000
 SEEN_RETENTION_DAYS = 365
 FETCH_TIMEOUT       = 15  # seconds per feed
 
