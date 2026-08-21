@@ -64,32 +64,29 @@ FEEDS = [
     "https://evilgodfahim.github.io/tbs/thoughts.xml",
 ]
 
-MASTER_FILE         = "feed_master.xml"
-DAILY_FILE          = "daily_feed.xml"
-SEEN_FILE           = "seen_ids.json"
-SOURCES_FILE        = "sources.txt"
-EMPTY_FILE          = "empty_feeds.xml"
+MASTER_FILE      = "feed_master.xml"
+DAILY_FILE       = "daily_feed.xml"
+SEEN_FILE        = "seen_ids.json"
+MASTER_SEEN_FILE = "master_seen_ids.json"   # persistent master dedup
+SOURCES_FILE     = "sources.txt"
+EMPTY_FILE       = "empty_feeds.xml"
 
-MAX_ITEMS           = 5000
+MAX_ITEMS           = 500
 SEEN_RETENTION_DAYS = 365
 FETCH_TIMEOUT       = 15  # seconds per feed
 
 # -----------------------------
-# SEEN-IDS HELPERS
+# SEEN-IDS HELPERS (daily feed)
 # -----------------------------
 
 def load_seen():
-    """
-    Returns (history_ids: set, history_dict: dict[id -> iso_str]).
-    Migrates old list format. Drops entries older than SEEN_RETENTION_DAYS.
-    """
     if not os.path.exists(SEEN_FILE):
         return set(), {}
     try:
         with open(SEEN_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
         cutoff = (datetime.now(timezone.utc) - timedelta(days=SEEN_RETENTION_DAYS)).isoformat()
-        raw = data.get("seen_ids", [])
+        raw    = data.get("seen_ids", [])
         if isinstance(raw, list):
             now_iso = datetime.now(timezone.utc).isoformat()
             history = {id_: now_iso for id_ in raw}
@@ -101,7 +98,6 @@ def load_seen():
 
 
 def save_seen(history: dict):
-    """Prune to SEEN_RETENTION_DAYS and persist."""
     cutoff = (datetime.now(timezone.utc) - timedelta(days=SEEN_RETENTION_DAYS)).isoformat()
     pruned = {id_: ts for id_, ts in history.items() if ts >= cutoff}
     try:
@@ -109,6 +105,43 @@ def save_seen(history: dict):
             json.dump({"seen_ids": pruned}, f, indent=2)
     except Exception:
         pass
+
+
+# -----------------------------
+# PERSISTENT MASTER SEEN IDS
+# Tracks every entry id ever added to master, with timestamps.
+# Survives the MAX_ITEMS cap — items evicted from master XML
+# won't be re-added on future runs.
+# -----------------------------
+
+def load_master_seen():
+    """
+    Returns (seen_dict, seen_set).
+      seen_dict: {id: iso_timestamp}  — for saving back
+      seen_set:  set of ids           — for fast lookup
+    """
+    if not os.path.exists(MASTER_SEEN_FILE):
+        return {}, set()
+    try:
+        with open(MASTER_SEEN_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=SEEN_RETENTION_DAYS)).isoformat()
+        raw    = data.get("seen_ids", {})
+        if isinstance(raw, list):
+            now_iso = datetime.now(timezone.utc).isoformat()
+            seen    = {id_: now_iso for id_ in raw}
+        else:
+            seen    = {id_: ts for id_, ts in raw.items() if ts >= cutoff}
+        return seen, set(seen.keys())
+    except Exception:
+        return {}, set()
+
+
+def save_master_seen(seen: dict):
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=SEEN_RETENTION_DAYS)).isoformat()
+    pruned = {id_: ts for id_, ts in seen.items() if ts >= cutoff}
+    with open(MASTER_SEEN_FILE, "w", encoding="utf-8") as f:
+        json.dump({"seen_ids": pruned}, f, indent=2)
 
 
 # -----------------------------
@@ -186,16 +219,13 @@ def extract_source(link):
 
 def fetch_feed(url, timeout=FETCH_TIMEOUT):
     """
-    Fetch via requests (real timeout + real HTTP errors), then parse with feedparser.
-
     Returns (raw_bytes, feed, warn_str | None).
       raw_bytes: response body — pass to parse_custom_xml to avoid a second HTTP hit.
-      feed:      feedparser result, or None on hard failure / total parse failure.
-      warn:      human-readable problem description, or None on full success.
+      feed:      feedparser result, or None on hard/total parse failure.
+      warn:      problem description, or None on full success.
 
-    Callers should skip the URL when raw_bytes is None (hard network/HTTP failure).
-    When feed is None but raw_bytes is not, try parse_custom_xml(raw_bytes).
-    When feed is not None but feed.entries is empty, also try parse_custom_xml(raw_bytes).
+    Callers skip when raw_bytes is None (hard network/HTTP failure).
+    When feed is None or feed.entries is empty, try parse_custom_xml(raw_bytes).
     """
     try:
         resp = requests.get(
@@ -217,17 +247,13 @@ def fetch_feed(url, timeout=FETCH_TIMEOUT):
     if resp.status_code >= 400:
         return None, None, f"HTTP {resp.status_code}"
 
-    raw = resp.content
-
-    # Pass bytes — lets feedparser sniff encoding from XML declaration / BOM
+    raw  = resp.content
     feed = feedparser.parse(raw)
 
     if feed.bozo:
         exc = getattr(feed, "bozo_exception", "unknown")
         if not feed.entries:
-            # Total feedparser failure — raw bytes still usable for custom parser
             return raw, None, f"malformed XML, 0 entries recoverable: {exc}"
-        # Partial parse — still worth using
         return raw, feed, f"malformed XML, {len(feed.entries)} entries recovered: {exc}"
 
     return raw, feed, None
@@ -235,17 +261,12 @@ def fetch_feed(url, timeout=FETCH_TIMEOUT):
 
 # -----------------------------
 # CUSTOM XML PARSER
-# Accepts already-fetched bytes OR a URL string (fallback, causes a second fetch).
-# Handles two schemas:
-#   1. Custom <article><url><snippet><published>
-#   2. Standard RSS <item><link><description><pubDate><guid>
 # -----------------------------
 
 def parse_custom_xml(url_or_bytes):
     """
-    Fallback parser for when feedparser returns no entries.
-    Pass raw bytes (from fetch_feed) to avoid a second HTTP round-trip.
-    A URL string is also accepted for standalone use (e.g. --empty-only).
+    Fallback parser. Accepts bytes (from fetch_feed) or a URL string.
+    Tries two schemas: custom <article> then standard RSS <item>.
     """
     if isinstance(url_or_bytes, bytes):
         raw = url_or_bytes
@@ -377,11 +398,11 @@ def load_existing(path):
                 desc_node  = it.find("description")
                 pub_node   = it.find("pubDate")
                 guid_node  = it.find("guid")
-                title = title_node.text.strip() if title_node is not None and title_node.text else ""
-                link  = link_node.text.strip()  if link_node  is not None and link_node.text  else ""
-                desc  = desc_node.text          if desc_node  is not None and desc_node.text  else ""
-                guid  = guid_node.text.strip()  if guid_node  is not None and guid_node.text  else link or ""
-                pub_text = pub_node.text.strip() if pub_node is not None and pub_node.text else None
+                title    = title_node.text.strip() if title_node is not None and title_node.text else ""
+                link     = link_node.text.strip()  if link_node  is not None and link_node.text  else ""
+                desc     = desc_node.text          if desc_node  is not None and desc_node.text  else ""
+                guid     = guid_node.text.strip()  if guid_node  is not None and guid_node.text  else link or ""
+                pub_text = pub_node.text.strip()   if pub_node   is not None and pub_node.text   else None
                 if pub_text:
                     try:
                         dt = parsedate_to_datetime(pub_text)
@@ -509,8 +530,15 @@ def adjust_duplicate_timestamps(items):
 def update_master():
     print("[Updating feed_master.xml]")
 
-    existing = load_existing(MASTER_FILE)
-    seen_ids = {x["id"] for x in existing}
+    existing     = load_existing(MASTER_FILE)
+    existing_ids = {x["id"] for x in existing}
+
+    # Load persistent seen ids — these survive the MAX_ITEMS cap.
+    # Union with current master so both sources guard against re-addition.
+    master_seen, master_seen_ids = load_master_seen()
+    seen_ids = existing_ids | master_seen_ids
+
+    now_iso       = datetime.now(timezone.utc).isoformat()
     new_items     = []
     empty_reports = []
 
@@ -519,7 +547,6 @@ def update_master():
     for url in FEEDS:
         raw, feed, warn = fetch_feed(url)
 
-        # Hard network/HTTP failure — nothing to work with
         if raw is None:
             skip_count += 1
             print(f"  [SKIP] {url}")
@@ -554,6 +581,7 @@ def update_master():
                         item["description"] = clean_html(item["description"])
                         new_items.append(item)
                         seen_ids.add(item["id"])
+                        master_seen[item["id"]] = now_iso   # mark as seen persistently
                         added += 1
                 print(
                     f"  [CUSTOM] {url}\n"
@@ -590,6 +618,7 @@ def update_master():
                     "id":          entry_id,
                 })
                 seen_ids.add(entry_id)
+                master_seen[entry_id] = now_iso   # mark as seen persistently
                 added += 1
             except Exception:
                 continue
@@ -603,6 +632,10 @@ def update_master():
         f"\n  feeds: {ok_count} ok / {warn_count} warn / {skip_count} skipped"
         f" / {len(FEEDS)} total"
     )
+
+    # Persist seen ids before trimming — so every processed id is remembered
+    # even if it gets evicted from master by the MAX_ITEMS cap.
+    save_master_seen(master_seen)
 
     all_items = existing + new_items
     all_items = adjust_duplicate_timestamps(all_items)
