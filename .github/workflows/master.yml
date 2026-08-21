@@ -35,7 +35,7 @@ jobs:
             echo '{"seen_ids": {}}' > master_seen_ids.json
           fi
 
-      - name: Commit & push master and empty feeds
+      - name: Commit & push
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
@@ -43,6 +43,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "Auto update feeds"
+            git commit -m "Auto update master feed"
             git push
           fi
