@@ -1,3 +1,4 @@
+aljazeera
 bangladeshpost
 daily-sun
 dailyasianage
@@ -5,6 +6,7 @@ dailynewnation
 dawn
 dhakatribune
 english
+middleeasteye
 newagebd
 observerbd
 tbsnews
