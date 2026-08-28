@@ -1,8 +1,11 @@
-bdnews24
 daily-sun
-dhakatribune
+dailyasianage
+dailynewnation
+dawn
+newagebd
 observerbd
 tbsnews
 thedailystar
 thefinancialexpress
 tob
+today
