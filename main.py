@@ -13,12 +13,6 @@ import re
 import requests
 from email.utils import parsedate_to_datetime
 
-try:
-    from bs4 import BeautifulSoup as _BS4
-    _HAS_BS4 = True
-except ImportError:
-    _HAS_BS4 = False
-
 # -----------------------------
 # CONFIGURATION
 # -----------------------------
@@ -70,12 +64,6 @@ FEEDS = [
     "https://politepaul.com/fd/aHOZhCiCh6Td.xml",
     "https://evilgodfahim.github.io/ds/deep_dive.xml",
     "https://evilgodfahim.github.io/tbs/thoughts.xml",
-]
-
-# HTML pages to scrape (no RSS feed available)
-SCRAPE_TARGETS = [
-    "https://www.newagebd.net/articlelist/126/Editorial",
-    "https://www.newagebd.net/articlelist/127/OP-ED",
 ]
 
 MASTER_FILE      = "feed_master.xml"
@@ -538,115 +526,6 @@ def adjust_duplicate_timestamps(items):
 
 
 # -----------------------------
-# HTML SCRAPER: NEW AGE BD
-# -----------------------------
-
-def scrape_newage_section(url):
-    """
-    Scrapes a New Age BD listing page (Editorial / OP-ED).
-    Handles three article zones: featured lead, featured side, regular cards.
-    Returns a list of article dicts compatible with the pipeline format.
-    Returns [] on any failure.
-    """
-    if not _HAS_BS4:
-        print(f"  [SKIP] {url}  —  beautifulsoup4 not installed")
-        return []
-
-    BASE = "https://www.newagebd.net"
-
-    try:
-        resp = requests.get(
-            url,
-            timeout=FETCH_TIMEOUT,
-            headers={
-                "User-Agent": "Mozilla/5.0 (compatible; feedparser/6.0)",
-                "Accept":     "text/html,*/*",
-            },
-            allow_redirects=True,
-        )
-        if resp.status_code >= 400:
-            print(f"  [SKIP] {url}  —  HTTP {resp.status_code}")
-            return []
-        soup = _BS4(resp.content, "html.parser")
-    except requests.exceptions.Timeout:
-        print(f"  [SKIP] {url}  —  timeout after {FETCH_TIMEOUT}s")
-        return []
-    except Exception as e:
-        print(f"  [SKIP] {url}  —  {e}")
-        return []
-
-    items      = []
-    seen_links = set()
-    now        = datetime.now(timezone.utc).replace(microsecond=0)
-
-    def resolve(href):
-        if not href:
-            return ""
-        return href if href.startswith("http") else BASE + href.rstrip()
-
-    def make_item(title, href, desc, pub_dt):
-        link = resolve(href)
-        if not link or link in seen_links:
-            return None
-        seen_links.add(link)
-        return {
-            "title":       (title or "No Title").strip(),
-            "link":        link,
-            "description": (desc or "").strip(),
-            "pubDate":     pub_dt,
-            "id":          link,   # URL is stable and unique
-        }
-
-    # ── Featured lead ──────────────────────────────────────────────────────
-    lead = soup.select_one("article.med-lead.hov")
-    if lead:
-        a = lead.select_one("h3.fs-headline a")
-        if a:
-            it = make_item(a.get_text(strip=True), a.get("href"), "", now)
-            if it:
-                items.append(it)
-
-    # ── Featured side articles ─────────────────────────────────────────────
-    for art in soup.select("article.med-g4 article.hov"):
-        a = art.select_one("h3 a.fs-sub-headline-2")
-        if a:
-            it = make_item(a.get_text(strip=True), a.get("href"), "", now)
-            if it:
-                items.append(it)
-
-    # ── Regular cards ──────────────────────────────────────────────────────
-    for card in soup.select(
-        "article.card.card-full.hover-a.mb-module.mb-md-5"
-    ):
-        a = card.select_one("h2.card-title a")
-        p = card.select_one("p.card-text.mb-2.d-none.d-lg-block")
-        t = card.select_one("time[datetime]")
-
-        href  = a.get("href") if a else ""
-        title = a.get_text(strip=True) if a else "No Title"
-        desc  = p.get_text(strip=True) if p else ""
-
-        pub_dt = now
-        if t:
-            raw_dt = t.get("datetime", "").strip()
-            if raw_dt:
-                try:
-                    dt = datetime.fromisoformat(raw_dt)
-                    if dt.tzinfo is None:
-                        dt = dt.replace(tzinfo=timezone.utc)
-                    pub_dt = dt.astimezone(timezone.utc).replace(microsecond=0)
-                except Exception:
-                    pass   # fall back to now
-
-        it = make_item(title, href, desc, pub_dt)
-        if it:
-            items.append(it)
-
-    print(f"  [SCRAPE] {url}  —  {len(items)} items")
-    return items
-
-
-# -----------------------------
 # LOGIC: MASTER FEED
 # -----------------------------
 
@@ -755,21 +634,6 @@ def update_master():
         f"\n  feeds: {ok_count} ok / {warn_count} warn / {skip_count} skipped"
         f" / {len(FEEDS)} total"
     )
-
-    # ── Scraped HTML sources ───────────────────────────────────────────────
-    print("[Scraping HTML sources]")
-    for scrape_url in SCRAPE_TARGETS:
-        scraped = scrape_newage_section(scrape_url)
-        added   = 0
-        for item in scraped:
-            if item["id"] not in seen_ids:
-                source        = extract_source(item["link"])
-                item["title"] = f"{item['title']}. [ {source} ]"
-                new_items.append(item)
-                seen_ids.add(item["id"])
-                master_seen[item["id"]] = now_iso
-                added += 1
-        print(f"         new={added}")
 
     # Persist seen ids before trimming — so every processed id is remembered
     # even if it gets evicted from master by the MAX_ITEMS cap.
