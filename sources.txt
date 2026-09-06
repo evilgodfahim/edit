@@ -1,4 +1,3 @@
-bangladeshpost
 daily-sun
 dailyasianage
 dailynewnation
@@ -10,4 +9,5 @@ observerbd
 tbsnews
 thedailystar
 thefinancialexpress
+thehindu
 today
