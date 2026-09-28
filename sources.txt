@@ -1,5 +1,5 @@
-bangladeshpost
 daily-sun
+dailyasianage
 dailynewnation
 dawn
 dhakatribune
@@ -9,6 +9,5 @@ observerbd
 tbsnews
 thedailystar
 thefinancialexpress
-thehindu
 tob
 today
