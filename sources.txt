@@ -1,13 +1,10 @@
-bangladeshpost
-bdnews24
 daily-sun
 dailyasianage
 dailynewnation
 dawn
 dhakatribune
+dw
 en
-ipsnews
-middleeasteye
 newagebd
 observerbd
 tbsnews
@@ -15,4 +12,3 @@ thedailystar
 thefinancialexpress
 tob
 today
-worldpoliticsreview
