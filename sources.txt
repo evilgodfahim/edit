@@ -2,6 +2,7 @@ bdnews24
 daily-sun
 dailyasianage
 dailynewnation
+dawn
 dhakatribune
 en
 newagebd
