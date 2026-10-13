@@ -1,8 +1,7 @@
-bdnews24
+asiatimes
 daily-sun
 dailyasianage
 dailynewnation
-dawn
 dhakatribune
 en
 middleeasteye
@@ -11,6 +10,5 @@ observerbd
 tbsnews
 thedailystar
 thefinancialexpress
-theguardian
 tob
 today
