@@ -1,3 +1,4 @@
+aljazeera
 daily-sun
 dailyasianage
 dailynewnation
@@ -9,6 +10,6 @@ observerbd
 tbsnews
 thedailystar
 thefinancialexpress
-thehindu
+theguardian
 tob
 today
