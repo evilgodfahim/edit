@@ -1,14 +1,14 @@
-consortiumnews
 daily-sun
 dailynewnation
 dawn
 dhakatribune
 en
+ipsnews
+middleeasteye
 newagebd
 observerbd
 tbsnews
 thedailystar
 thefinancialexpress
-thehindu
 tob
 today
