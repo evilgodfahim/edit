@@ -1,4 +1,4 @@
-bdnews24
+aljazeera
 daily-sun
 dailyasianage
 dailynewnation
@@ -10,6 +10,5 @@ observerbd
 tbsnews
 thedailystar
 thefinancialexpress
-thehindu
 tob
 today
