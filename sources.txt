@@ -1,12 +1,13 @@
-aljazeera
+atlanticcouncil
+bangladeshpost
 daily-sun
 dailyasianage
 dailynewnation
-dawn
 dhakatribune
 en
 newagebd
 observerbd
+scmp
 tbsnews
 thedailystar
 thefinancialexpress
