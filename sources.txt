@@ -1,11 +1,9 @@
-bangladeshpost
 bdnews24
 daily-sun
 dailyasianage
 dailynewnation
-dawn
 dhakatribune
-ipsnews
+en
 newagebd
 observerbd
 tbsnews
