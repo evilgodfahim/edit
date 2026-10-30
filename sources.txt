@@ -1,13 +1,15 @@
-bdnews24
+bangladeshpost
 daily-sun
 dailyasianage
 dailynewnation
 dhakatribune
 en
 newagebd
+news
 observerbd
 tbsnews
 thedailystar
 thefinancialexpress
+thehindu
 tob
 today
