@@ -1,15 +1,13 @@
-archive
 daily-sun
 dailyasianage
 dailynewnation
 dawn
-dhakatribune
 en
 newagebd
 observerbd
 tbsnews
 thedailystar
 thefinancialexpress
-thehindu
+theguardian
 tob
 today
