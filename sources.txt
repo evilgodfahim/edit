@@ -1,13 +1,12 @@
-asiatimes
-bdnews24
 daily-sun
 dailyasianage
 dailynewnation
 dawn
 dhakatribune
-en
+ipdefenseforum
 newagebd
 observerbd
+scmp
 tbsnews
 thedailystar
 thefinancialexpress
