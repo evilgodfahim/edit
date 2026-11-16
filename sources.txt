@@ -1,14 +1,15 @@
+bbc
 daily-sun
 dailyasianage
 dailynewnation
 dawn
 dhakatribune
-ipdefenseforum
+en
 newagebd
 observerbd
-scmp
 tbsnews
 thedailystar
 thefinancialexpress
+thehindu
 tob
 today
