@@ -1,10 +1,10 @@
 archive
+asiatimes
 daily-sun
 dailyasianage
 dawn
 dhakatribune
 en
-hindustantimes
 newagebd
 observerbd
 tbsnews
