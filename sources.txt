@@ -1,3 +1,6 @@
+aljazeera
+asiatimes
+bdnews24
 daily-sun
 dailyasianage
 dhakatribune
@@ -7,5 +10,6 @@ observerbd
 tbsnews
 thedailystar
 thefinancialexpress
+thehindu
 tob
 today
