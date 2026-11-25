@@ -1,15 +1,10 @@
-aljazeera
-asiatimes
-bdnews24
-daily-sun
 dailyasianage
-dhakatribune
+dawn
 en
 newagebd
 observerbd
 tbsnews
 thedailystar
 thefinancialexpress
-thehindu
 tob
 today
