@@ -1,5 +1,4 @@
-bangladeshpost
-bdnews24
+atlanticcouncil
 daily-sun
 dailyasianage
 dawn
@@ -7,7 +6,6 @@ dhakatribune
 en
 indianexpress
 ipsnews
-middleeasteye
 newagebd
 observerbd
 tbsnews
